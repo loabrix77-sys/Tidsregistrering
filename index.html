@@ -243,8 +243,8 @@
 const LS = {
   regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1'
 };
-const CATEGORIES = ['Udvikling','Møde','Design','Support','Administration','Planlægning','Andet'];
-const CAT_COLORS = {Udvikling:'#10b981','Møde':'#fbbf24',Design:'#6366f1',Support:'#22d3ee',Administration:'#a78bfa','Planlægning':'#f43f5e',Andet:'#71717a'};
+const CATEGORIES = ['Udvikling','Rådgivning','Strategi','Mødetid','Undervisning','Facilitering','Design','Support','Administration','Planlægning','Andet'];
+const CAT_COLORS = {Udvikling:'#10b981','Rådgivning':'#0ea5e9',Strategi:'#8b5cf6','Mødetid':'#f59e0b',Undervisning:'#ec4899',Facilitering:'#14b8a6',Design:'#6366f1',Support:'#06b6d4',Administration:'#a78bfa','Planlægning':'#e11d48',Andet:'#71717a'};
 const DK_MONTHS = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
 
 // ---------- State ----------
@@ -829,6 +829,10 @@ function bind(){
 }
 
 function boot(){
+  // migrate old "Møde" category -> "Mødetid"
+  let migrated=false;
+  regs=regs.map(r=>{ if(r.category==='Møde'){migrated=true; return {...r,category:'Mødetid'};} return r; });
+  if(migrated){ save(LS.regs,regs); scheduleSync(); }
   initSelect(); bind(); loadSettingsUI();
   $('mDate').value=todayStr();
   renderAll();
