@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OrbitAI · AI-drevet Tidsregistrering</title>
+<style>
+  :root{
+    --bg:#09090b; --panel:#0e0e11; --panel2:#141418; --border:#26262b;
+    --border2:#1c1c20; --text:#e4e4e7; --muted:#8a8a93; --muted2:#5d5d66;
+    --indigo:#6366f1; --indigo-d:#4f46e5; --emerald:#10b981; --rose:#f43f5e;
+    --amber:#fbbf24; --cyan:#22d3ee; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 16px 64px;}
+  .glow{position:fixed;top:-100px;right:-100px;width:420px;height:420px;background:rgba(79,70,229,.06);border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0}
+  header,.card{position:relative;z-index:1}
+  h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em}
+  h1 .ai{color:var(--indigo)}
+  .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;
+    background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px 22px;margin-bottom:20px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:42px;height:42px;border-radius:13px;background:var(--indigo-d);display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 8px 24px -8px rgba(79,70,229,.6)}
+  .logo span{width:18px;height:18px;border:2.5px solid #fff;border-radius:6px}
+  .hdr-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .pill{font-size:12px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;gap:8px;font-weight:500}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted2)}
+  .dot.on{background:var(--emerald);animation:pulse 1.6s infinite}
+  .dot.warn{background:var(--amber)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;
+    padding:0 15px;height:40px;border-radius:12px;transition:.15s;white-space:nowrap}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:var(--indigo-d);color:#fff}
+  .btn-primary:hover:not(:disabled){background:var(--indigo)}
+  .btn-ghost{background:var(--panel2);border:1px solid var(--border);color:var(--text)}
+  .btn-ghost:hover:not(:disabled){background:#1d1d22}
+  .btn-white{background:#fff;color:#09090b}
+  .btn-white:hover:not(:disabled){background:#e9e9ec}
+  .icon-btn{width:40px;height:40px;border-radius:12px;background:var(--panel2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text);transition:.15s}
+  .icon-btn:hover{background:#1d1d22}
+  .icon-btn.active{background:var(--indigo-d);border-color:var(--indigo);color:#fff}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:22px;margin-bottom:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .grid-charts{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:860px){.grid2,.grid-charts{grid-template-columns:1fr}.grid-stats{grid-template-columns:repeat(2,1fr)}}
+  label.fl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted2);font-weight:700;display:block;margin-bottom:6px}
+  input,select,textarea{width:100%;background:#0a0a0c;border:1px solid var(--border);border-radius:12px;
+    padding:10px 12px;color:var(--text);font-family:inherit;font-size:13px;transition:.15s}
+  input:focus,select,textarea:focus,select:focus{outline:none;border-color:var(--indigo)}
+  textarea{resize:vertical;min-height:70px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted2);font-weight:700}
+  .card-title{font-size:18px;font-weight:300;letter-spacing:-.01em;margin:2px 0 0}
+  .muted{color:var(--muted)}
+  .small{font-size:12px}
+  .xsmall{font-size:11px}
+  .row{display:flex;gap:10px}
+  .row.wrap{flex-wrap:wrap}
+  .mic{width:84px;height:84px;border-radius:20px;display:flex;align-items:center;justify-content:center;position:relative;transition:.2s;background:#0a0a0c;border:1px solid var(--border);color:var(--text)}
+  .mic.listening{background:var(--rose);color:#fff;border-color:transparent}
+  .mic.parsing{background:var(--indigo-d);color:#fff;border-color:transparent}
+  .mic .ping{position:absolute;inset:0;border-radius:20px;background:rgba(244,63,94,.25);animation:ping 1.2s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(1.35);opacity:0}}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid;display:inline-block}
+  .draft{background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:10px}
+  .reg{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--border2);border-radius:14px;background:#0a0a0c;margin-bottom:8px}
+  .reg .meta{flex:1;min-width:0}
+  .reg .act{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reg .sub2{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reg .hrs{font-weight:700;font-size:14px;white-space:nowrap}
+  .stat{background:#0a0a0c;border:1px solid var(--border2);border-radius:16px;padding:15px}
+  .stat .n{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:4px}
+  .stat .l{font-size:11px;color:var(--muted)}
+  .alert{border-radius:16px;padding:14px 16px;font-size:12px;display:flex;gap:10px;align-items:flex-start;margin-bottom:16px}
+  .alert.err{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);color:#fda4b4}
+  .alert.info{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);color:#c7c8f7}
+  .alert.warn{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fcd9a0}
+  .hidden{display:none!important}
+  .legend{display:flex;flex-direction:column;gap:7px}
+  .legrow{display:flex;align-items:center;gap:8px;font-size:12px}
+  .swatch{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+  .bar-track{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px}
+  .iconbtn-sm{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:.15s}
+  .iconbtn-sm:hover{background:var(--panel2);color:var(--text)}
+  a.link{color:var(--indigo);text-decoration:none}
+  a.link:hover{text-decoration:underline}
+  .sep{height:1px;background:var(--border2);margin:16px 0}
+  .chip{font-size:11px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer}
+  .chip.active{background:var(--indigo-d);border-color:var(--indigo);color:#fff}
+  svg{display:block}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#2a2a30;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo"><span></span></div>
+      <div>
+        <h1>Orbit<span class="ai">AI</span></h1>
+        <div class="sub">AI-drevet tidsregistrering · dansk stemmestyring · Google Sheets</div>
+      </div>
+    </div>
+    <div class="hdr-actions">
+      <div class="pill"><span id="syncDot" class="dot"></span><span id="syncMsg">Gemmer lokalt i din browser</span></div>
+      <a id="openSheet" class="btn btn-primary hidden" target="_blank" rel="noopener noreferrer">Åbn Sheet</a>
+      <button id="connectBtn" class="btn btn-white">Forbind Google Sheets</button>
+      <button id="syncBtn" class="icon-btn" title="Synkroniser nu">⟳</button>
+      <button id="settingsBtn" class="icon-btn" title="Indstillinger">⚙</button>
+    </div>
+  </header>
+
+  <!-- Settings -->
+  <div id="settingsPanel" class="card hidden">
+    <div class="eyebrow">Indstillinger</div>
+    <div class="card-title" style="margin-bottom:14px">Nøgler & forbindelse</div>
+    <div class="grid2">
+      <div>
+        <label class="fl">Gemini API-nøgle (gemmes kun i din browser)</label>
+        <input id="geminiKey" type="password" class="mono" placeholder="AIza..." autocomplete="off" />
+        <div class="xsmall muted" style="margin-top:6px">Bruges til AI-tolkning af tale/tekst. Hentes på <a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Lad feltet stå tomt for kun at bruge browserens tale + manuelle felter.</div>
+        <label class="fl" style="margin-top:14px">Gemini-model</label>
+        <input id="geminiModel" class="mono" placeholder="gemini-2.5-flash" />
+      </div>
+      <div>
+        <label class="fl">Google OAuth Client-ID (til Sheets-synk)</label>
+        <input id="clientId" type="text" class="mono" placeholder="....apps.googleusercontent.com" autocomplete="off" />
+        <div class="xsmall muted" style="margin-top:6px">OAuth 2.0 <b>Web</b>-client fra Google Cloud Console. Tilføj den side den hostes på (origin) under "Authorized JavaScript origins". Nødvendig for at gemme i Sheets.</div>
+        <label class="fl" style="margin-top:14px">Forbind manuelt Sheet (URL eller ID)</label>
+        <div class="row">
+          <input id="manualSheet" class="mono" placeholder="https://docs.google.com/spreadsheets/d/..." />
+          <button id="linkSheetBtn" class="btn btn-ghost" style="flex:0 0 auto">Forbind</button>
+        </div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="row wrap" style="align-items:center;justify-content:space-between">
+      <div class="xsmall muted">Indstillinger ligger lokalt (localStorage). Intet sendes til andre end Google.</div>
+      <div class="row">
+        <button id="newSheetBtn" class="btn btn-ghost">Opret nyt rent ark</button>
+        <button id="saveSettings" class="btn btn-primary">Gem indstillinger</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="errorBox" class="alert err hidden"><span>⚠</span><div id="errorText"></div></div>
+
+  <!-- Input row -->
+  <div class="grid2">
+    <!-- Voice -->
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="eyebrow">Stemme-styring & AI</div>
+      <div class="card-title">Hurtig Stemmeregistrering</div>
+      <p class="small muted" style="margin:12px 0 0">Klik på mikrofonen og tal naturligt på dansk. F.eks. <i style="color:var(--text)">"Holdt 2 timers møde med Kunde A om frontend design"</i>. Med en Gemini-nøgle oprettes registreringen automatisk.</p>
+      <div style="display:flex;flex-direction:column;align-items:center;margin:20px 0 6px">
+        <button id="micBtn" class="mic"><span id="micIcon">🎙️</span></button>
+        <div id="voiceStatus" class="small muted" style="margin-top:14px">Klar til stemmestyring</div>
+      </div>
+      <div id="transcriptBox" class="draft hidden"><span class="xsmall mono muted">Transkription:</span><div id="transcriptText" style="font-style:italic;margin-top:4px"></div></div>
+    </div>
+
+    <!-- Manual / quick parse -->
+    <div class="card">
+      <div class="eyebrow">Registrering</div>
+      <div class="card-title">Tilføj tidsregistrering</div>
+
+      <div style="margin-top:14px">
+        <label class="fl">Hurtig AI-tekst (valgfri)</label>
+        <div class="row">
+          <textarea id="quickText" placeholder="Skriv frit, f.eks. 'I går 1,5 time support for Firma X og 30 min admin'"></textarea>
+        </div>
+        <button id="parseBtn" class="btn btn-ghost" style="margin-top:8px;width:100%">✨ Tolk med AI</button>
+        <div id="parseInfo" class="xsmall muted" style="margin-top:6px"></div>
+      </div>
+
+      <div id="draftsBox"></div>
+
+      <div class="sep"></div>
+      <form id="manualForm">
+        <div class="grid2" style="gap:12px">
+          <div><label class="fl">Kunde / Projekt</label><input id="mClient" placeholder="Kunde A" /></div>
+          <div><label class="fl">Dato</label><input id="mDate" type="date" /></div>
+        </div>
+        <div style="margin-top:12px"><label class="fl">Aktivitet</label><input id="mActivity" placeholder="Beskrivelse af opgaven" required /></div>
+        <div class="grid2" style="gap:12px;margin-top:12px">
+          <div><label class="fl">Varighed (timer)</label><input id="mDuration" type="number" step="0.25" min="0" placeholder="1.5" /></div>
+          <div><label class="fl">Kategori</label><select id="mCategory"></select></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:14px;width:100%">+ Tilføj registrering</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="card">
+    <div class="row wrap" style="align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div><div class="eyebrow">Overblik</div><div class="card-title">Registreringer (<span id="regCount">0</span>)</div></div>
+      <input id="search" placeholder="Søg..." style="max-width:240px" />
+    </div>
+    <div id="catFilter" class="row wrap" style="margin-bottom:14px;gap:7px"></div>
+    <div id="regList"></div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="grid-stats" style="margin-bottom:20px">
+    <div class="stat"><div class="l">Total timer</div><div class="n" id="statTotal">0</div></div>
+    <div class="stat"><div class="l">Registreringer</div><div class="n" id="statCount">0</div></div>
+    <div class="stat"><div class="l">Kunder/projekter</div><div class="n" id="statClients">0</div></div>
+    <div class="stat"><div class="l">Timer denne uge</div><div class="n" id="statWeek">0</div></div>
+  </div>
+  <div class="grid-charts">
+    <div class="card"><div class="eyebrow">Fordeling</div><div class="card-title" style="margin-bottom:14px">Timer pr. kategori</div>
+      <div class="row" style="align-items:center;gap:20px"><div id="donut"></div><div id="catLegend" class="legend" style="flex:1"></div></div>
+    </div>
+    <div class="card"><div class="eyebrow">Top</div><div class="card-title" style="margin-bottom:14px">Timer pr. kunde</div>
+      <div id="clientBars"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   OrbitAI — single-file time tracker
+   Offline-first (localStorage) · Gemini (own key) · Google Sheets
+   ============================================================ */
+
+const LS = {
+  regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1'
+};
+const CATEGORIES = ['Udvikling','Møde','Design','Support','Administration','Planlægning','Andet'];
+const CAT_COLORS = {Udvikling:'#10b981','Møde':'#fbbf24',Design:'#6366f1',Support:'#22d3ee',Administration:'#a78bfa','Planlægning':'#f43f5e',Andet:'#71717a'};
+const DK_MONTHS = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
+
+// ---------- State ----------
+let regs = load(LS.regs, []);
+let settings = load(LS.settings, {geminiKey:'',geminiModel:'gemini-2.5-flash',clientId:''});
+let sheetId = load(LS.sheet, null);
+let accessToken = null, tokenExpiry = 0, tokenClient = null;
+let drafts = [];
+let searchTerm = '', catFilterVal = 'Alle';
+
+// sync control
+let dirty = false, debounceTimer = null;
+let syncQueue = Promise.resolve();
+
+// ---------- Helpers ----------
+function load(k,def){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):def;}catch(e){return def;} }
+function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
+function $(id){return document.getElementById(id);}
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function uuid(){return (crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36);}
+function connected(){return Boolean(sheetId && settings.clientId);}
+
+/* Guard against spreadsheet formula injection: any text starting with
+   = + - @ (or control chars) is prefixed with an apostrophe so Sheets
+   stores it as literal text instead of evaluating it as a formula. */
+function safeCell(v){
+  if(typeof v!=='string') return v;
+  if(/^[=+\-@\t\r]/.test(v)) return "'"+v;
+  return v;
+}
+
+/* Validate anything coming from the AI before it touches state/sheet. */
+function validateParsed(r){
+  const category = CATEGORIES.includes(r && r.category) ? r.category : 'Andet';
+  let duration = Number(r && r.duration);
+  if(!isFinite(duration) || duration < 0 || duration > 24) duration = 0;
+  let date = (r && typeof r.date==='string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) ? r.date : todayStr();
+  const client = String((r&&r.client)||'').slice(0,200);
+  const activity = String((r&&r.activity)||'').slice(0,500);
+  return {client, activity, duration, category, date};
+}
+
+function setError(msg){
+  const box=$('errorBox');
+  if(!msg){box.classList.add('hidden');return;}
+  $('errorText').innerHTML = '<b>Fejl:</b> '+esc(msg);
+  box.classList.remove('hidden');
+}
+function setSync(msg, state){ // state: '', 'on', 'warn'
+  $('syncMsg').textContent = msg;
+  const dot=$('syncDot'); dot.className='dot'+(state?(' '+state):'');
+}
+
+// ============================================================
+//  CRUD + autosave
+// ============================================================
+function addRegistrations(items){ // items already validated {client,activity,duration,category,date}
+  const created = items.map(r=>({...r, id:uuid(), createdAt:new Date().toISOString(), synced:false}));
+  regs = [...created, ...regs];
+  persistAndSchedule();
+}
+function updateRegistration(id, fields){
+  regs = regs.map(r=> r.id===id ? {...r,...fields,synced:false} : r);
+  persistAndSchedule();
+}
+function deleteRegistration(id){
+  regs = regs.filter(r=>r.id!==id);
+  persistAndSchedule();
+}
+function persistAndSchedule(){
+  save(LS.regs, regs);
+  renderAll();
+  scheduleSync();
+}
+
+function scheduleSync(){
+  if(!connected()){ if(regs.some(r=>!r.synced)) setSync('Gemt lokalt — afventer forbindelse','warn'); return; }
+  dirty = true;
+  setSync('Ændring registreret — gemmer snart...','warn');
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(flushSync, 2500);
+}
+// periodic safety-net autosave every 30s if anything is pending
+setInterval(()=>{ if(dirty && connected()) flushSync(); }, 30000);
+// flush on tab close
+window.addEventListener('beforeunload',(e)=>{ if(dirty && connected()){ /* best-effort */ } });
+
+function flushSync(){
+  if(!connected() || !dirty) return;
+  dirty = false;
+  setSync('Synkroniserer...','warn');
+  syncQueue = syncQueue.then(()=>doSync(regs.slice())).then(()=>{
+    regs = regs.map(r=>({...r,synced:true}));
+    save(LS.regs, regs); renderList(); renderDashboard();
+    setSync('Synkroniseret med Google Sheets', 'on');
+    setError('');
+  }).catch(err=>{
+    console.error('Sync failed', err);
+    dirty = true; // retry on next change/interval
+    setSync('Synkroniseringsfejl — gemt lokalt','warn');
+    setError(err.message||'Kunne ikke synkronisere med Google Sheets.');
+  });
+  return syncQueue;
+}
+
+// ============================================================
+//  Google Identity Services — OAuth token
+// ============================================================
+function initTokenClient(){
+  if(!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  if(!settings.clientId) return false;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: settings.clientId,
+    scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+    callback: ()=>{}, // replaced per-request
+  });
+  return true;
+}
+function ensureToken(){
+  return new Promise((resolve,reject)=>{
+    if(accessToken && Date.now() < tokenExpiry-60000) return resolve(accessToken);
+    if(!tokenClient && !initTokenClient()) return reject(new Error('Google er ikke konfigureret. Indtast OAuth Client-ID under Indstillinger.'));
+    tokenClient.callback = (resp)=>{
+      if(resp.error) return reject(new Error('Google-login afvist: '+resp.error));
+      accessToken = resp.access_token;
+      tokenExpiry = Date.now() + (resp.expires_in||3600)*1000;
+      resolve(accessToken);
+    };
+    try{ tokenClient.requestAccessToken({prompt: accessToken? '' : 'consent'}); }
+    catch(e){ reject(e); }
+  });
+}
+
+// ---------- Sheets REST ----------
+async function gfetch(token,url,opts){
+  const r = await fetch(url,{...opts, headers:{Authorization:'Bearer '+token, ...(opts&&opts.headers)}});
+  if(!r.ok){ const t=await r.text().catch(()=> ''); throw new Error('Google API '+r.status+': '+t.slice(0,200)); }
+  return r.status===204?{}:r.json();
+}
+async function findSpreadsheet(token){
+  const q=encodeURIComponent("name = 'Tidsregistreringer' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+  const d=await gfetch(token,`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&fields=files(id,name)`);
+  return (d.files&&d.files[0])?d.files[0].id:null;
+}
+async function createSpreadsheet(token){
+  const d=await gfetch(token,'https://sheets.googleapis.com/v4/spreadsheets',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({properties:{title:'Tidsregistreringer'}})
+  });
+  return d.spreadsheetId;
+}
+function colLetter(n){let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-m)/26);}return s;}
+function safeSheetName(name){const c=String(name).trim().replace(/[\/\\?*:\[\]]/g,'');return c.slice(0,31).trim()||'Unavngivet';}
+function monthSheetName(ym){const p=ym.split('-');if(p.length<2)return ym;const i=parseInt(p[1],10)-1;return (i>=0&&i<12)?`${DK_MONTHS[i]} ${p[0]}`:ym;}
+
+// ---------- Full multi-tab sync (with injection guard) ----------
+async function doSync(registrations){
+  const token = await ensureToken();
+  const id = sheetId;
+  const syncTime = new Date().toLocaleString('da-DK');
+
+  const meta = await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
+  const sheets = meta.sheets||[];
+
+  if(registrations.length===0){
+    const ranges = sheets.map(s=>`'${s.properties.title}'!A1:Z1000`);
+    if(ranges.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges})});
+    return;
+  }
+
+  const sheetsMap=new Map(); sheets.forEach(s=>sheetsMap.set(s.properties.title,s.properties.sheetId));
+
+  const desired=new Set(['Alle Registreringer']);
+  const clients=[...new Set(registrations.map(r=>r.client.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'da'));
+  clients.forEach(c=>desired.add(safeSheetName(c)));
+  const months=[...new Set(registrations.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort();
+  months.forEach(m=>desired.add(monthSheetName(m)));
+
+  // align tabs
+  const requests=[];
+  const defaults=['Sheet1','Ark1','Blad1','Sheet 1','Ark 1'];
+  if(!sheetsMap.has('Alle Registreringer')){
+    let renId=null,renTitle=null;
+    for(const n of defaults){if(sheetsMap.has(n)){renId=sheetsMap.get(n);renTitle=n;break;}}
+    if(renId===null && sheets.length){const t=sheets[0].properties.title; if(!desired.has(t)){renId=sheets[0].properties.sheetId;renTitle=t;}}
+    if(renId!==null){requests.push({updateSheetProperties:{properties:{sheetId:renId,title:'Alle Registreringer'},fields:'title'}});sheetsMap.set('Alle Registreringer',renId);sheetsMap.delete(renTitle);}
+  }
+  desired.forEach(t=>{if(!sheetsMap.has(t))requests.push({addSheet:{properties:{title:t}}});});
+  const skip=new Set([...defaults,'Alle Registreringer']);
+  sheetsMap.forEach((sid,t)=>{if(!desired.has(t)&&!skip.has(t))requests.push({deleteSheet:{sheetId:sid}});});
+  if(requests.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests})});
+
+  // refetch ids
+  const meta2=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
+  const finalMap=new Map(); (meta2.sheets||[]).forEach(s=>finalMap.set(s.properties.title,s.properties.sheetId));
+
+  // clear
+  const clearRanges=[...desired].map(t=>`'${t}'!A1:Z1000`);
+  await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges:clearRanges})});
+
+  // build data
+  const data=[];
+  // Tab 1: all
+  const raw=[...registrations].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const rawRows=[['ID','Dato','Kunde/Projekt','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den'],
+    ...raw.map(r=>[r.id, r.date, safeCell(r.client), safeCell(r.activity), r.duration, safeCell(r.category), syncTime])];
+  data.push({range:`'Alle Registreringer'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
+
+  // Tab 2: per client
+  clients.forEach(client=>{
+    const name=safeSheetName(client);
+    const cr=registrations.filter(r=>r.client.trim()===client)
+      .sort((a,b)=> a.date!==b.date? a.date.localeCompare(b.date): a.createdAt.localeCompare(b.createdAt));
+    const rows=[['ID','Dato','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den']];
+    cr.forEach(r=>rows.push([r.id,r.date,safeCell(r.activity),r.duration,safeCell(r.category),syncTime]));
+    if(cr.length) rows.push(['','TOTAL','',`=SUM(D2:D${cr.length+1})`,'','']);
+    data.push({range:`'${name}'!A1:F${rows.length}`,majorDimension:'ROWS',values:rows});
+  });
+
+  // Tab 3: monthly matrix
+  months.forEach(ym=>{
+    const name=monthSheetName(ym);
+    const y=parseInt(ym.slice(0,4),10), m=parseInt(ym.slice(5,7),10);
+    const days=new Date(y,m,0).getDate();
+    const mRegs=registrations.filter(r=>r.date&&r.date.startsWith(ym));
+    const mClients=[...new Set(mRegs.map(r=>r.client.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'da'));
+    if(!mClients.length) return;
+    const rows=[['Dato',...mClients.map(safeCell),'Total']];
+    const lastCol=colLetter(1+mClients.length), totCol=colLetter(2+mClients.length);
+    for(let d=1;d<=days;d++){
+      const rIdx=d+1, ds=`${ym}-${String(d).padStart(2,'0')}`, rv=[ds];
+      mClients.forEach(c=>{const sum=mRegs.filter(r=>r.date===ds&&r.client.trim()===c).reduce((a,x)=>a+(x.duration||0),0);rv.push(sum>0?sum:'');});
+      rv.push(`=SUM(B${rIdx}:${lastCol}${rIdx})`); rows.push(rv);
+    }
+    const bottom=['TOTAL'];
+    for(let c=0;c<mClients.length;c++){const cl=colLetter(2+c);bottom.push(`=SUM(${cl}2:${cl}${days+1})`);}
+    bottom.push(`=SUM(${totCol}2:${totCol}${days+1})`); rows.push(bottom);
+    data.push({range:`'${name}'!A1:${totCol}${rows.length}`,majorDimension:'ROWS',values:rows});
+  });
+
+  await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});
+
+  // light formatting: header rows + frozen
+  const fmt=[];
+  const headerFmt=(sid,cols,color)=>{
+    fmt.push({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
+    fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:cols},
+      cell:{userEnteredFormat:{backgroundColor:color,textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true,fontSize:10},horizontalAlignment:'CENTER'}},
+      fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}});
+  };
+  if(finalMap.has('Alle Registreringer')) headerFmt(finalMap.get('Alle Registreringer'),7,{red:45/255,green:55/255,blue:72/255});
+  clients.forEach(c=>{const sid=finalMap.get(safeSheetName(c));if(sid!==undefined)headerFmt(sid,6,{red:30/255,green:58/255,blue:138/255});});
+  months.forEach(ym=>{const sid=finalMap.get(monthSheetName(ym));if(sid!==undefined)headerFmt(sid,3,{red:4/255,green:120/255,blue:87/255});});
+  if(fmt.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:fmt})}).catch(()=>{});
+}
+
+// ---------- Connect flow ----------
+async function connect(){
+  if(!settings.clientId){ openSettings(); setError('Indtast et Google OAuth Client-ID under Indstillinger for at forbinde.'); return; }
+  setSync('Forbinder til Google...','warn'); setError('');
+  try{
+    const token=await ensureToken();
+    let id=sheetId;
+    if(!id){ setSync('Søger efter ark...','warn'); id=await findSpreadsheet(token); }
+    if(!id){ setSync('Opretter "Tidsregistreringer"...','warn'); id=await createSpreadsheet(token); }
+    sheetId=id; save(LS.sheet,id);
+    updateSheetLink();
+    setSync('Synkroniserer...','warn');
+    await syncQueue.then(()=>doSync(regs.slice()));
+    regs=regs.map(r=>({...r,synced:true})); save(LS.regs,regs); renderList();
+    setSync('Synkroniseret med Google Sheets','on');
+  }catch(err){ console.error(err); setError(err.message||'Forbindelse mislykkedes.'); setSync('Ikke forbundet','warn'); }
+}
+async function createNewSheet(){
+  if(!settings.clientId){ openSettings(); setError('Indtast et Google OAuth Client-ID først.'); return; }
+  try{
+    setSync('Opretter nyt ark...','warn');
+    const token=await ensureToken();
+    const id=await createSpreadsheet(token);
+    sheetId=id; save(LS.sheet,id); updateSheetLink();
+    await syncQueue.then(()=>doSync(regs.slice()));
+    regs=regs.map(r=>({...r,synced:true})); save(LS.regs,regs); renderList();
+    setSync('Nyt ark oprettet og synkroniseret','on');
+  }catch(err){ setError(err.message); setSync('Fejl','warn'); }
+}
+function linkManualSheet(){
+  let v=$('manualSheet').value.trim(); if(!v)return;
+  const m=v.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/); if(m&&m[1])v=m[1];
+  if(v.length<15){ setError('Ugyldigt Sheet-link eller ID.'); return; }
+  sheetId=v; save(LS.sheet,v); updateSheetLink(); $('manualSheet').value='';
+  setError(''); connect();
+}
+function updateSheetLink(){
+  const a=$('openSheet');
+  if(sheetId){ a.href=`https://docs.google.com/spreadsheets/d/${sheetId}/edit`; a.classList.remove('hidden'); }
+  else a.classList.add('hidden');
+}
+
+// ============================================================
+//  Gemini (browser, user's own key)
+// ============================================================
+async function parseWithAI(text){
+  const key=settings.geminiKey&&settings.geminiKey.trim();
+  if(!key) throw new Error('Ingen Gemini-nøgle. Tilføj den under Indstillinger, eller udfyld felterne manuelt.');
+  const input=String(text).slice(0,2000); // input length cap
+  const model=(settings.geminiModel||'gemini-2.5-flash').trim();
+  const sys=`Du er en intelligent tidsregistrerings-assistent, ekspert i at tolke ustruktureret dansk tekst/tale.
+Identificér tidsregistreringer. Hvis flere opgaver/koder/projekter nævnes, opdel i flere registreringer.
+For hver: "client" (kunde/projekt, tom streng hvis ukendt), "activity" (renset professionel dansk beskrivelse),
+"duration" (timer som tal, f.eks. 0.5, 1.5, 2.75; null hvis ukendt), "category" (PRÆCIST en af: ${CATEGORIES.join(', ')}),
+"date" (YYYY-MM-DD; udregn relative angivelser som "i går"/"i mandags" ud fra brugerens nuværende tidspunkt; ellers dags dato).
+Brugerens nuværende tidspunkt: ${new Date().toISOString()}`;
+  const body={
+    systemInstruction:{parts:[{text:sys}]},
+    contents:[{role:'user',parts:[{text:`Fortolk denne tidsregistrering og opdel i flere hvis relevant: "${input}"`}]}],
+    generationConfig:{
+      responseMimeType:'application/json',
+      responseSchema:{type:'OBJECT',properties:{results:{type:'ARRAY',items:{type:'OBJECT',
+        properties:{client:{type:'STRING'},activity:{type:'STRING'},duration:{type:'NUMBER',nullable:true},category:{type:'STRING'},date:{type:'STRING'}},
+        required:['activity','category','date']}}},required:['results']}
+    }
+  };
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text().catch(()=> ''); throw new Error('Gemini '+r.status+(r.status===400?': tjek nøgle/model':'')+'.'); }
+  const d=await r.json();
+  const out=d&&d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts&&d.candidates[0].content.parts[0].text;
+  if(!out) throw new Error('Tomt svar fra Gemini.');
+  const parsed=JSON.parse(out.trim());
+  return (parsed.results||[]).map(validateParsed);
+}
+
+// ============================================================
+//  Voice (Web Speech API)
+// ============================================================
+let recognition=null, listening=false;
+function setVoice(state){ // idle/listening/parsing/error
+  const b=$('micBtn'), i=$('micIcon'), s=$('voiceStatus');
+  b.className='mic'+(state==='listening'?' listening':state==='parsing'?' parsing':'');
+  b.innerHTML = state==='listening'?'<span class="ping"></span><span id="micIcon">🎙️</span>'
+    : '<span id="micIcon">'+(state==='parsing'?'✨':'🎙️')+'</span>';
+  const map={idle:'Klar til stemmestyring',listening:'Optager... tal nu på dansk',parsing:'Gemini analyserer din tale...',error:'Lydfejl'};
+  s.textContent=map[state]||'';
+  s.style.color = state==='listening'?'var(--rose)':state==='parsing'?'var(--indigo)':'var(--muted)';
+}
+function startListening(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ $('voiceStatus').textContent='Browseren understøtter ikke stemmegenkendelse (prøv Chrome/Edge).'; return; }
+  try{
+    recognition=new SR(); recognition.continuous=false; recognition.interimResults=false; recognition.lang='da-DK';
+    let got=false;
+    recognition.onstart=()=>{listening=true;setVoice('listening');};
+    recognition.onerror=(e)=>{listening=false; setVoice('error');
+      $('voiceStatus').textContent = e.error==='not-allowed'?'Mikrofonadgang nægtet.':e.error==='no-speech'?'Ingen lyd registreret — prøv igen.':'Fejl: '+e.error;};
+    recognition.onend=()=>{listening=false; if(!got) setVoice('idle');};
+    recognition.onresult=async(e)=>{
+      const txt=e.results[0][0].transcript;
+      if(txt&&txt.trim()){ got=true;
+        $('transcriptBox').classList.remove('hidden'); $('transcriptText').textContent='"'+txt+'"';
+        if(settings.geminiKey&&settings.geminiKey.trim()){
+          setVoice('parsing');
+          try{ const res=await parseWithAI(txt); showDrafts(res); setVoice('idle'); }
+          catch(err){ setVoice('error'); $('voiceStatus').textContent=err.message; $('quickText').value=txt; }
+        } else { $('quickText').value=txt; setVoice('idle'); }
+      }
+    };
+    recognition.start();
+  }catch(err){ setVoice('error'); $('voiceStatus').textContent='Kunne ikke starte mikrofonen.'; }
+}
+function stopListening(){ if(recognition){try{recognition.stop();}catch(e){}} listening=false; }
+
+// ============================================================
+//  Drafts (AI results awaiting confirmation)
+// ============================================================
+function showDrafts(results){
+  drafts = results||[];
+  renderDrafts();
+  if(drafts.length) $('parseInfo').textContent = drafts.length+' registrering(er) tolket — gennemse og tilføj.';
+  else $('parseInfo').textContent = 'AI fandt ingen registreringer i teksten.';
+}
+function renderDrafts(){
+  const box=$('draftsBox'); box.innerHTML='';
+  if(!drafts.length) return;
+  drafts.forEach((d,idx)=>{
+    const el=document.createElement('div'); el.className='draft';
+    el.innerHTML=`
+      <div class="row wrap" style="align-items:center;justify-content:space-between;gap:8px">
+        <span class="tag" style="border-color:${CAT_COLORS[d.category]}55;color:${CAT_COLORS[d.category]};background:${CAT_COLORS[d.category]}14">${esc(d.category)}</span>
+        <span class="xsmall muted">${esc(d.date)}</span>
+      </div>
+      <div style="font-weight:600;margin-top:6px">${esc(d.activity)||'<span class="muted">(ingen aktivitet)</span>'}</div>
+      <div class="xsmall muted" style="margin-top:2px">${esc(d.client)||'—'} · ${d.duration||0} t</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-primary" data-add="${idx}" style="height:32px">Tilføj</button>
+        <button class="btn btn-ghost" data-skip="${idx}" style="height:32px">Fjern</button>
+      </div>`;
+    box.appendChild(el);
+  });
+  box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const i=+b.dataset.add;addRegistrations([drafts[i]]);drafts.splice(i,1);renderDrafts();});
+  box.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{const i=+b.dataset.skip;drafts.splice(i,1);renderDrafts();});
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function renderAll(){ renderList(); renderDashboard(); updateSheetLink(); }
+
+function renderList(){
+  $('regCount').textContent=regs.length;
+  // filter chips
+  const cf=$('catFilter'); cf.innerHTML='';
+  ['Alle',...CATEGORIES].forEach(c=>{
+    const b=document.createElement('button'); b.className='chip'+(catFilterVal===c?' active':''); b.textContent=c;
+    b.onclick=()=>{catFilterVal=c;renderList();}; cf.appendChild(b);
+  });
+  const list=$('regList'); list.innerHTML='';
+  let items=regs.filter(r=>{
+    const okCat = catFilterVal==='Alle'||r.category===catFilterVal;
+    const okS = !searchTerm || (r.activity+' '+r.client).toLowerCase().includes(searchTerm.toLowerCase());
+    return okCat&&okS;
+  });
+  if(!items.length){ list.innerHTML='<div class="muted small" style="text-align:center;padding:28px 0">Ingen registreringer endnu.</div>'; return; }
+  items.forEach(r=>{
+    const el=document.createElement('div'); el.className='reg';
+    const col=CAT_COLORS[r.category]||'#71717a';
+    el.innerHTML=`
+      <div style="width:4px;align-self:stretch;border-radius:4px;background:${col}"></div>
+      <div class="meta">
+        <div class="act">${esc(r.activity)}</div>
+        <div class="sub2">${esc(r.client)||'—'} · ${esc(r.date)} · <span style="color:${col}">${esc(r.category)}</span> ${r.synced?'· ✓ synket':'· • lokal'}</div>
+      </div>
+      <div class="hrs">${(r.duration||0).toLocaleString('da-DK')} t</div>
+      <button class="iconbtn-sm" data-edit="${r.id}" title="Rediger">✎</button>
+      <button class="iconbtn-sm" data-del="${r.id}" title="Slet">🗑</button>`;
+    list.appendChild(el);
+  });
+  list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm('Slet denne registrering?')) deleteRegistration(b.dataset.del); });
+  list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editInline(b.dataset.edit));
+}
+
+function editInline(id){
+  const r=regs.find(x=>x.id===id); if(!r)return;
+  const client=prompt('Kunde/Projekt:',r.client); if(client===null)return;
+  const activity=prompt('Aktivitet:',r.activity); if(activity===null)return;
+  const dur=prompt('Varighed (timer):',r.duration); if(dur===null)return;
+  const date=prompt('Dato (YYYY-MM-DD):',r.date); if(date===null)return;
+  const v=validateParsed({client,activity,duration:dur,category:r.category,date});
+  updateRegistration(id,v);
+}
+
+function renderDashboard(){
+  const total=regs.reduce((a,r)=>a+(r.duration||0),0);
+  $('statTotal').textContent=total.toLocaleString('da-DK',{maximumFractionDigits:2});
+  $('statCount').textContent=regs.length;
+  $('statClients').textContent=new Set(regs.map(r=>r.client.trim()).filter(Boolean)).size;
+  // week
+  const now=new Date(); const day=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-day); monday.setHours(0,0,0,0);
+  const week=regs.filter(r=>{const d=new Date(r.date);return d>=monday;}).reduce((a,r)=>a+(r.duration||0),0);
+  $('statWeek').textContent=week.toLocaleString('da-DK',{maximumFractionDigits:2});
+
+  // donut by category
+  const byCat={}; CATEGORIES.forEach(c=>byCat[c]=0); regs.forEach(r=>{byCat[r.category]=(byCat[r.category]||0)+(r.duration||0);});
+  const cats=CATEGORIES.filter(c=>byCat[c]>0);
+  const sum=cats.reduce((a,c)=>a+byCat[c],0);
+  const donut=$('donut'); const R=52,r0=34,cx=64,cy=64;
+  if(sum<=0){ donut.innerHTML=`<svg width="128" height="128"><circle cx="64" cy="64" r="${R}" fill="none" stroke="#1c1c20" stroke-width="${R-r0}"/></svg>`; }
+  else{
+    let a0=-Math.PI/2, paths='';
+    cats.forEach(c=>{
+      const frac=byCat[c]/sum, a1=a0+frac*2*Math.PI;
+      const large=(a1-a0)>Math.PI?1:0;
+      const x0=cx+R*Math.cos(a0),y0=cy+R*Math.sin(a0),x1=cx+R*Math.cos(a1),y1=cy+R*Math.sin(a1);
+      const xi1=cx+r0*Math.cos(a1),yi1=cy+r0*Math.sin(a1),xi0=cx+r0*Math.cos(a0),yi0=cy+r0*Math.sin(a0);
+      paths+=`<path d="M${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} L${xi1} ${yi1} A${r0} ${r0} 0 ${large} 0 ${xi0} ${yi0} Z" fill="${CAT_COLORS[c]}"/>`;
+      a0=a1;
+    });
+    donut.innerHTML=`<svg width="128" height="128">${paths}<text x="64" y="60" text-anchor="middle" fill="#e4e4e7" font-size="20" font-weight="700">${total.toLocaleString('da-DK',{maximumFractionDigits:1})}</text><text x="64" y="78" text-anchor="middle" fill="#8a8a93" font-size="10">timer</text></svg>`;
+  }
+  const leg=$('catLegend'); leg.innerHTML='';
+  if(!cats.length){ leg.innerHTML='<span class="muted small">Ingen data endnu.</span>'; }
+  cats.forEach(c=>{const row=document.createElement('div');row.className='legrow';
+    row.innerHTML=`<span class="swatch" style="background:${CAT_COLORS[c]}"></span><span style="flex:1">${esc(c)}</span><span class="muted">${byCat[c].toLocaleString('da-DK',{maximumFractionDigits:2})} t</span>`;leg.appendChild(row);});
+
+  // client bars
+  const byClient={}; regs.forEach(r=>{const c=r.client.trim()||'(uden kunde)';byClient[c]=(byClient[c]||0)+(r.duration||0);});
+  const sorted=Object.entries(byClient).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const max=Math.max(1,...sorted.map(e=>e[1]));
+  const cb=$('clientBars'); cb.innerHTML='';
+  if(!sorted.length){ cb.innerHTML='<span class="muted small">Ingen data endnu.</span>'; }
+  sorted.forEach(([c,v],i)=>{const d=document.createElement('div');d.style.marginBottom='12px';
+    d.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:5px"><span class="small">${esc(c)}</span><span class="small muted">${v.toLocaleString('da-DK',{maximumFractionDigits:2})} t</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100)}%;background:${['#6366f1','#10b981','#fbbf24','#22d3ee','#a78bfa','#f43f5e'][i%6]}"></div></div>`;cb.appendChild(d);});
+}
+
+// ============================================================
+//  Settings UI
+// ============================================================
+function openSettings(){ $('settingsPanel').classList.toggle('hidden'); }
+function loadSettingsUI(){
+  $('geminiKey').value=settings.geminiKey||'';
+  $('geminiModel').value=settings.geminiModel||'gemini-2.5-flash';
+  $('clientId').value=settings.clientId||'';
+}
+function saveSettingsUI(){
+  const newClientId=$('clientId').value.trim();
+  const clientChanged = newClientId!==settings.clientId;
+  settings={geminiKey:$('geminiKey').value.trim(),geminiModel:$('geminiModel').value.trim()||'gemini-2.5-flash',clientId:newClientId};
+  save(LS.settings,settings);
+  if(clientChanged){ tokenClient=null; accessToken=null; tokenExpiry=0; initTokenClient(); }
+  $('settingsPanel').classList.add('hidden');
+  setSync(connected()?'Forbundet — klar':'Gemmer lokalt i din browser', connected()?'on':'');
+}
+
+// ============================================================
+//  Wire up
+// ============================================================
+function initSelect(){ const s=$('mCategory'); CATEGORIES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);}); }
+
+function bind(){
+  $('micBtn').onclick=()=> listening?stopListening():startListening();
+  $('settingsBtn').onclick=openSettings;
+  $('saveSettings').onclick=saveSettingsUI;
+  $('connectBtn').onclick=connect;
+  $('syncBtn').onclick=()=>{ if(connected()) flushSync(); else connect(); };
+  $('newSheetBtn').onclick=createNewSheet;
+  $('linkSheetBtn').onclick=linkManualSheet;
+  $('openSheet');
+  $('search').oninput=(e)=>{searchTerm=e.target.value;renderList();};
+  $('parseBtn').onclick=async()=>{
+    const t=$('quickText').value.trim(); if(!t)return;
+    $('parseBtn').disabled=true; $('parseInfo').textContent='Tolker...';
+    try{ const res=await parseWithAI(t); showDrafts(res); }
+    catch(err){ $('parseInfo').textContent=err.message; }
+    finally{ $('parseBtn').disabled=false; }
+  };
+  $('manualForm').onsubmit=(e)=>{
+    e.preventDefault();
+    const v=validateParsed({client:$('mClient').value,activity:$('mActivity').value,duration:$('mDuration').value,category:$('mCategory').value,date:$('mDate').value});
+    if(!v.activity){ setError('Aktivitet er påkrævet.'); return; }
+    addRegistrations([v]);
+    $('mClient').value='';$('mActivity').value='';$('mDuration').value='';$('mCategory').value='Udvikling';$('mDate').value=todayStr();
+  };
+}
+
+function boot(){
+  initSelect(); bind(); loadSettingsUI();
+  $('mDate').value=todayStr();
+  renderAll();
+  if(connected()) setSync('Forbundet — synkroniserer ved ændringer','on');
+  else setSync('Gemmer lokalt i din browser','');
+  // try init token client once GIS is available
+  const tryInit=()=>{ if(window.google&&google.accounts&&google.accounts.oauth2){ initTokenClient(); } else setTimeout(tryInit,400); };
+  tryInit();
+}
+boot();
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</body>
+</html>
