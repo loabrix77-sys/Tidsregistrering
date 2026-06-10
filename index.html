@@ -106,7 +106,7 @@
 <body>
 <div class="glow"></div>
 <div class="wrap">
-
+ 
   <header>
     <div class="brand">
       <div class="logo"><span></span></div>
@@ -123,7 +123,7 @@
       <button id="settingsBtn" class="icon-btn" title="Indstillinger">⚙</button>
     </div>
   </header>
-
+ 
   <!-- Settings -->
   <div id="settingsPanel" class="card hidden">
     <div class="eyebrow">Indstillinger</div>
@@ -156,9 +156,9 @@
       </div>
     </div>
   </div>
-
+ 
   <div id="errorBox" class="alert err hidden"><span>⚠</span><div id="errorText"></div></div>
-
+ 
   <!-- Input row -->
   <div class="grid2">
     <!-- Voice -->
@@ -172,12 +172,12 @@
       </div>
       <div id="transcriptBox" class="draft hidden"><span class="xsmall mono muted">Transkription:</span><div id="transcriptText" style="font-style:italic;margin-top:4px"></div></div>
     </div>
-
+ 
     <!-- Manual / quick parse -->
     <div class="card">
       <div class="eyebrow">Registrering</div>
       <div class="card-title">Tilføj tidsregistrering</div>
-
+ 
       <div style="margin-top:14px">
         <label class="fl">Hurtig AI-tekst (valgfri)</label>
         <div class="row">
@@ -186,9 +186,9 @@
         <button id="parseBtn" class="btn btn-ghost" style="margin-top:8px;width:100%">✨ Tolk med AI</button>
         <div id="parseInfo" class="xsmall muted" style="margin-top:6px"></div>
       </div>
-
+ 
       <div id="draftsBox"></div>
-
+ 
       <div class="sep"></div>
       <form id="manualForm">
         <div class="grid2" style="gap:12px">
@@ -204,7 +204,7 @@
       </form>
     </div>
   </div>
-
+ 
   <!-- List -->
   <div class="card">
     <div class="row wrap" style="align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -214,7 +214,7 @@
     <div id="catFilter" class="row wrap" style="margin-bottom:14px;gap:7px"></div>
     <div id="regList"></div>
   </div>
-
+ 
   <!-- Dashboard -->
   <div class="grid-stats" style="margin-bottom:20px">
     <div class="stat"><div class="l">Total timer</div><div class="n" id="statTotal">0</div></div>
@@ -230,23 +230,23 @@
       <div id="clientBars"></div>
     </div>
   </div>
-
+ 
 </div>
-
+ 
 <script>
 "use strict";
 /* ============================================================
    OrbitAI — single-file time tracker
    Offline-first (localStorage) · Gemini (own key) · Google Sheets
    ============================================================ */
-
+ 
 const LS = {
   regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1'
 };
 const CATEGORIES = ['Udvikling','Rådgivning','Strategi','Mødetid','Undervisning','Facilitering','Design','Support','Administration','Planlægning','Andet'];
 const CAT_COLORS = {Udvikling:'#10b981','Rådgivning':'#0ea5e9',Strategi:'#8b5cf6','Mødetid':'#f59e0b',Undervisning:'#ec4899',Facilitering:'#14b8a6',Design:'#6366f1',Support:'#06b6d4',Administration:'#a78bfa','Planlægning':'#e11d48',Andet:'#71717a'};
 const DK_MONTHS = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
-
+ 
 // ---------- State ----------
 let regs = load(LS.regs, []);
 let settings = load(LS.settings, {geminiKey:'',geminiModel:'gemini-2.5-flash',clientId:''});
@@ -254,11 +254,11 @@ let sheetId = load(LS.sheet, null);
 let accessToken = null, tokenExpiry = 0, tokenClient = null;
 let drafts = [];
 let searchTerm = '', catFilterVal = 'Alle';
-
+ 
 // sync control
 let dirty = false, debounceTimer = null;
 let syncQueue = Promise.resolve();
-
+ 
 // ---------- Helpers ----------
 function load(k,def){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):def;}catch(e){return def;} }
 function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
@@ -267,7 +267,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function uuid(){return (crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36);}
 function connected(){return Boolean(sheetId && settings.clientId);}
-
+ 
 /* Guard against spreadsheet formula injection: any text starting with
    = + - @ (or control chars) is prefixed with an apostrophe so Sheets
    stores it as literal text instead of evaluating it as a formula. */
@@ -276,7 +276,7 @@ function safeCell(v){
   if(/^[=+\-@\t\r]/.test(v)) return "'"+v;
   return v;
 }
-
+ 
 /* Validate anything coming from the AI before it touches state/sheet. */
 function validateParsed(r){
   const category = CATEGORIES.includes(r && r.category) ? r.category : 'Andet';
@@ -287,7 +287,7 @@ function validateParsed(r){
   const activity = String((r&&r.activity)||'').slice(0,500);
   return {client, activity, duration, category, date};
 }
-
+ 
 function setError(msg){
   const box=$('errorBox');
   if(!msg){box.classList.add('hidden');return;}
@@ -298,7 +298,7 @@ function setSync(msg, state){ // state: '', 'on', 'warn'
   $('syncMsg').textContent = msg;
   const dot=$('syncDot'); dot.className='dot'+(state?(' '+state):'');
 }
-
+ 
 // ============================================================
 //  CRUD + autosave
 // ============================================================
@@ -320,7 +320,7 @@ function persistAndSchedule(){
   renderAll();
   scheduleSync();
 }
-
+ 
 function scheduleSync(){
   if(!connected()){ if(regs.some(r=>!r.synced)) setSync('Gemt lokalt — afventer forbindelse','warn'); return; }
   dirty = true;
@@ -332,7 +332,7 @@ function scheduleSync(){
 setInterval(()=>{ if(dirty && connected()) flushSync(); }, 30000);
 // flush on tab close
 window.addEventListener('beforeunload',(e)=>{ if(dirty && connected()){ /* best-effort */ } });
-
+ 
 function flushSync(){
   if(!connected() || !dirty) return;
   dirty = false;
@@ -350,7 +350,7 @@ function flushSync(){
   });
   return syncQueue;
 }
-
+ 
 // ============================================================
 //  Google Identity Services — OAuth token
 // ============================================================
@@ -378,7 +378,7 @@ function ensureToken(){
     catch(e){ reject(e); }
   });
 }
-
+ 
 // ---------- Sheets REST ----------
 async function gfetch(token,url,opts){
   const r = await fetch(url,{...opts, headers:{Authorization:'Bearer '+token, ...(opts&&opts.headers)}});
@@ -399,33 +399,158 @@ async function createSpreadsheet(token){
 }
 function colLetter(n){let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-m)/26);}return s;}
 function safeSheetName(name){const c=String(name).trim().replace(/[\/\\?*:\[\]]/g,'');return c.slice(0,31).trim()||'Unavngivet';}
-function monthSheetName(ym){const p=ym.split('-');if(p.length<2)return ym;const i=parseInt(p[1],10)-1;return (i>=0&&i<12)?`${DK_MONTHS[i]} ${p[0]}`:ym;}
-
-// ---------- Full multi-tab sync (with injection guard) ----------
+// ---------- per-client × month sheets ----------
+const DK_MON_SHORT=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const MONTH_TARGETS={'digital dogme':96};
+function targetFor(c){return MONTH_TARGETS[String(c).trim().toLowerCase()]||null;}
+function clientMonthTab(c,ym){const p=ym.split('-');const mon=DK_MON_SHORT[+p[1]-1]||p[1];return safeSheetName(`${c} · ${mon} ${p[0]}`);}
+function isoWeekNum(y,m,d){const dt=new Date(Date.UTC(y,m-1,d));const day=(dt.getUTCDay()+6)%7;dt.setUTCDate(dt.getUTCDate()-day+3);const ft=new Date(Date.UTC(dt.getUTCFullYear(),0,4));return 1+Math.round(((dt-ft)/86400000-3+((ft.getUTCDay()+6)%7))/7);}
+function prevYm(ym){let y=+ym.slice(0,4),m=+ym.slice(5,7);m--;if(m<1){m=12;y--;}return `${y}-${String(m).padStart(2,'0')}`;}
+function fmtH(n){return Number(n||0).toLocaleString('da-DK',{minimumFractionDigits:1,maximumFractionDigits:2});}
+function statusKind(diff,started){if(!started)return 'future';if(diff>0.05)return 'good';if(diff<-0.05)return 'bad';return 'neutral';}
+function statusLabel(diff,started){if(!started)return 'kommende';if(diff>0.05)return `+${fmtH(diff)} foran`;if(diff<-0.05)return `−${fmtH(Math.abs(diff))} bagud`;return '±0 i mål';}
+function barText(val,max){const n=20;const f=Math.max(0,Math.min(n,Math.round((val/max)*n)));return '█'.repeat(f)+'░'.repeat(n-f);}
+ 
+function buildWeeks(ym,regs,target,today){
+  const y=+ym.slice(0,4),m=+ym.slice(5,7),days=new Date(y,m,0).getDate();
+  const byWeek=new Map();
+  for(let d=1;d<=days;d++){
+    const wk=isoWeekNum(y,m,d);
+    let e=byWeek.get(wk);if(!e){e={wk,first:d,last:d,hours:0};byWeek.set(wk,e);}
+    e.last=d;const ds=`${ym}-${String(d).padStart(2,'0')}`;
+    e.hours+=regs.filter(r=>r.date===ds).reduce((a,r)=>a+(r.duration||0),0);
+  }
+  const arr=[...byWeek.values()].sort((a,b)=>a.first-b.first);let cum=0;
+  arr.forEach(w=>{cum+=w.hours;w.cum=Math.round(cum*100)/100;w.expected=Math.round(target*(w.last/days)*10)/10;
+    w.started=(`${ym}-${String(w.first).padStart(2,'0')}`)<=today;w.diff=Math.round((w.cum-w.expected)*10)/10;});
+  return {arr,days};
+}
+ 
+function buildTargetTab(client,ym,registrations,today){
+  const target=targetFor(client);
+  const monShort=DK_MON_SHORT[+ym.slice(5,7)-1];
+  const title=`${client} · ${monShort} ${ym.slice(0,4)}`;
+  const monthRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(ym))
+    .sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.createdAt.localeCompare(b.createdAt));
+  const total=Math.round(monthRegs.reduce((a,r)=>a+(r.duration||0),0)*100)/100;
+  const {arr,days}=buildWeeks(ym,monthRegs,target,today);
+  const prev=prevYm(ym);
+  const prevRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(prev));
+  let carryText='ingen data fra sidste måned';
+  if(prevRegs.length){const pt=Math.round(prevRegs.reduce((a,r)=>a+(r.duration||0),0)*100)/100;const c=Math.round((pt-target)*10)/10;carryText=(c>=0?'+':'−')+fmtH(Math.abs(c))+(c>=0?' t (overskud)':' t (underskud)');}
+  const curYm=today.slice(0,7);let elapsed;
+  if(ym<curYm)elapsed=days;else if(ym>curYm)elapsed=0;else elapsed=Math.min(+today.slice(8,10),days);
+  const expNow=Math.round(target*(elapsed/days)*10)/10;
+  const overallDiff=Math.round((total-expNow)*10)/10;
+  const pct=Math.round((total/target)*100);
+  const rows=[];const meta={cols:6,type:'target',headerRows:[],totalRows:[],statusCells:[],numRanges:[]};
+  rows.push([title,'','','','','']);
+  rows.push(['','','','','','']);
+  rows.push(['Månedsmål (t)',target,'','Registreret (t)',total,'']);
+  rows.push(['Rest (t)',Math.round((target-total)*100)/100,'','Overført fra sidste md.',carryText,'']);
+  rows.push(['Forventet pace nu (t)',expNow,'','Status',statusLabel(overallDiff,elapsed>0),'']);
+  rows.push(['Fremdrift',barText(total,target),'','% af mål',pct+'%','']);
+  meta.statusCells.push({row:4,col:4,kind:statusKind(overallDiff,elapsed>0)});
+  meta.numRanges.push({r0:2,r1:5,c0:1,c1:2});
+  meta.numRanges.push({r0:2,r1:3,c0:4,c1:5});
+  rows.push(['','','','','','']);
+  rows.push(['Uge','Periode','Registreret (t)','Akkumuleret (t)','Forventet (t)','Status']);
+  meta.headerRows.push(7);
+  const wStart=8;
+  arr.forEach((w,i)=>{
+    const r=wStart+i;
+    rows.push([`Uge ${w.wk}`,`${w.first}.–${w.last}. ${monShort}`,w.started?w.hours:'',w.started?w.cum:'',w.expected,statusLabel(w.diff,w.started)]);
+    meta.statusCells.push({row:r,col:5,kind:statusKind(w.diff,w.started)});
+  });
+  const wEnd=wStart+arr.length;
+  rows.push(['Måned i alt','',total,total,target,statusLabel(overallDiff,elapsed>0)]);
+  meta.totalRows.push(wEnd);
+  meta.statusCells.push({row:wEnd,col:5,kind:statusKind(overallDiff,elapsed>0)});
+  meta.numRanges.push({r0:wStart,r1:wEnd+1,c0:2,c1:5});
+  rows.push(['','','','','','']);
+  const regHdr=rows.length;
+  rows.push(['Dato','Aktivitet','Varighed (t)','Kategori','','']);
+  meta.headerRows.push(regHdr);
+  const regStart=rows.length;
+  monthRegs.forEach(r=>rows.push([r.date,safeCell(r.activity),r.duration,safeCell(r.category),'','']));
+  const regEnd=rows.length;
+  if(monthRegs.length){rows.push(['I alt','',`=SUM(C${regStart+1}:C${regEnd})`,'','','']);meta.totalRows.push(regEnd);meta.numRanges.push({r0:regStart,r1:regEnd+1,c0:2,c1:3});}
+  return {rows,meta};
+}
+ 
+function buildPlainTab(client,ym,registrations){
+  const monShort=DK_MON_SHORT[+ym.slice(5,7)-1];
+  const title=`${client} · ${monShort} ${ym.slice(0,4)}`;
+  const monthRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(ym))
+    .sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.createdAt.localeCompare(b.createdAt));
+  const rows=[];const meta={cols:4,type:'plain',headerRows:[],totalRows:[],statusCells:[],numRanges:[]};
+  rows.push([title,'','','']);
+  rows.push(['','','','']);
+  rows.push(['Dato','Aktivitet','Varighed (t)','Kategori']);
+  meta.headerRows.push(2);
+  const regStart=rows.length;
+  monthRegs.forEach(r=>rows.push([r.date,safeCell(r.activity),r.duration,safeCell(r.category)]));
+  const regEnd=rows.length;
+  if(monthRegs.length){rows.push(['I alt','',`=SUM(C${regStart+1}:C${regEnd})`,'']);meta.totalRows.push(regEnd);meta.numRanges.push({r0:regStart,r1:regEnd+1,c0:2,c1:3});}
+  return {rows,meta};
+}
+ 
+function applyTabFmt(fmt,sid,m){
+  const white={red:1,green:1,blue:1};
+  fmt.push({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
+  fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:m.cols},
+    cell:{userEnteredFormat:{backgroundColor:{red:36/255,green:31/255,blue:33/255},textFormat:{foregroundColor:white,bold:true,fontSize:13},horizontalAlignment:'LEFT',verticalAlignment:'MIDDLE'}},
+    fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)'}});
+  m.headerRows.forEach(r=>fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:r,endRowIndex:r+1,startColumnIndex:0,endColumnIndex:m.cols},
+    cell:{userEnteredFormat:{backgroundColor:{red:23/255,green:30/255,blue:25/255},textFormat:{foregroundColor:white,bold:true,fontSize:10},horizontalAlignment:'LEFT'}},
+    fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}}));
+  m.totalRows.forEach(r=>fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:r,endRowIndex:r+1,startColumnIndex:0,endColumnIndex:m.cols},
+    cell:{userEnteredFormat:{textFormat:{bold:true},backgroundColor:{red:244/255,green:245/255,blue:247/255}}},fields:'userEnteredFormat(textFormat,backgroundColor)'}}));
+  m.numRanges.forEach(nr=>fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:nr.r0,endRowIndex:nr.r1,startColumnIndex:nr.c0,endColumnIndex:nr.c1},
+    cell:{userEnteredFormat:{numberFormat:{type:'NUMBER',pattern:'#,##0.0'},horizontalAlignment:'RIGHT'}},fields:'userEnteredFormat(numberFormat,horizontalAlignment)'}}));
+  const KIND={good:{bg:{red:.88,green:.96,blue:.93},fg:{red:.06,green:.43,blue:.34}},bad:{bg:{red:.99,green:.92,blue:.92},fg:{red:.64,green:.18,blue:.18}},neutral:{bg:{red:.95,green:.94,blue:.91},fg:{red:.37,green:.37,blue:.35}},future:{bg:{red:1,green:1,blue:1},fg:{red:.6,green:.63,blue:.65}}};
+  m.statusCells.forEach(sc=>{const k=KIND[sc.kind]||KIND.neutral;fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:sc.row,endRowIndex:sc.row+1,startColumnIndex:sc.col,endColumnIndex:sc.col+1},
+    cell:{userEnteredFormat:{backgroundColor:k.bg,textFormat:{foregroundColor:k.fg,bold:true}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}});});
+  const widths=m.type==='target'?[170,150,130,140,120,150]:[120,300,130,150];
+  widths.forEach((w,i)=>fmt.push({updateDimensionProperties:{range:{sheetId:sid,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w},fields:'pixelSize'}}));
+}
+ 
+// ---------- Full sync (per-client × month, injection-guarded) ----------
 async function doSync(registrations){
-  const token = await ensureToken();
-  const id = sheetId;
-  const syncTime = new Date().toLocaleString('da-DK');
-
-  const meta = await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
-  const sheets = meta.sheets||[];
-
+  const token=await ensureToken();
+  const id=sheetId;
+  const today=todayStr();
+  const syncTime=new Date().toLocaleString('da-DK');
+ 
+  const meta=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
+  const sheets=meta.sheets||[];
+ 
   if(registrations.length===0){
-    const ranges = sheets.map(s=>`'${s.properties.title}'!A1:Z1000`);
+    const ranges=sheets.map(s=>`'${s.properties.title}'!A1:Z1000`);
     if(ranges.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
       {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges})});
     return;
   }
-
+ 
   const sheetsMap=new Map(); sheets.forEach(s=>sheetsMap.set(s.properties.title,s.properties.sheetId));
-
+ 
   const desired=new Set(['Alle Registreringer']);
-  const clients=[...new Set(registrations.map(r=>r.client.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'da'));
-  clients.forEach(c=>desired.add(safeSheetName(c)));
-  const months=[...new Set(registrations.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort();
-  months.forEach(m=>desired.add(monthSheetName(m)));
-
-  // align tabs
+  const data=[]; const tabMeta={};
+ 
+  const raw=[...registrations].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const rawRows=[['ID','Dato','Kunde/Projekt','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den'],
+    ...raw.map(r=>[r.id,r.date,safeCell(r.client),safeCell(r.activity),r.duration,safeCell(r.category),syncTime])];
+  data.push({range:`'Alle Registreringer'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
+ 
+  const combos=new Map();
+  registrations.forEach(r=>{const cl=r.client.trim();const ym=(r.date||'').slice(0,7);if(!cl||!ym)return;const name=clientMonthTab(cl,ym);if(!combos.has(name))combos.set(name,{client:cl,ym});});
+  [...combos.entries()].sort((a,b)=>a[0].localeCompare(b[0],'da')).forEach(([name,info])=>{
+    desired.add(name);
+    const built=targetFor(info.client)?buildTargetTab(info.client,info.ym,registrations,today):buildPlainTab(info.client,info.ym,registrations);
+    tabMeta[name]=built.meta;
+    data.push({range:`'${name}'!A1:${colLetter(built.meta.cols)}${built.rows.length}`,majorDimension:'ROWS',values:built.rows});
+  });
+ 
   const requests=[];
   const defaults=['Sheet1','Ark1','Blad1','Sheet 1','Ark 1'];
   if(!sheetsMap.has('Alle Registreringer')){
@@ -439,75 +564,30 @@ async function doSync(registrations){
   sheetsMap.forEach((sid,t)=>{if(!desired.has(t)&&!skip.has(t))requests.push({deleteSheet:{sheetId:sid}});});
   if(requests.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests})});
-
-  // refetch ids
+ 
   const meta2=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
   const finalMap=new Map(); (meta2.sheets||[]).forEach(s=>finalMap.set(s.properties.title,s.properties.sheetId));
-
-  // clear
+ 
   const clearRanges=[...desired].map(t=>`'${t}'!A1:Z1000`);
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges:clearRanges})});
-
-  // build data
-  const data=[];
-  // Tab 1: all
-  const raw=[...registrations].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
-  const rawRows=[['ID','Dato','Kunde/Projekt','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den'],
-    ...raw.map(r=>[r.id, r.date, safeCell(r.client), safeCell(r.activity), r.duration, safeCell(r.category), syncTime])];
-  data.push({range:`'Alle Registreringer'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
-
-  // Tab 2: per client
-  clients.forEach(client=>{
-    const name=safeSheetName(client);
-    const cr=registrations.filter(r=>r.client.trim()===client)
-      .sort((a,b)=> a.date!==b.date? a.date.localeCompare(b.date): a.createdAt.localeCompare(b.createdAt));
-    const rows=[['ID','Dato','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den']];
-    cr.forEach(r=>rows.push([r.id,r.date,safeCell(r.activity),r.duration,safeCell(r.category),syncTime]));
-    if(cr.length) rows.push(['','TOTAL','',`=SUM(D2:D${cr.length+1})`,'','']);
-    data.push({range:`'${name}'!A1:F${rows.length}`,majorDimension:'ROWS',values:rows});
-  });
-
-  // Tab 3: monthly matrix
-  months.forEach(ym=>{
-    const name=monthSheetName(ym);
-    const y=parseInt(ym.slice(0,4),10), m=parseInt(ym.slice(5,7),10);
-    const days=new Date(y,m,0).getDate();
-    const mRegs=registrations.filter(r=>r.date&&r.date.startsWith(ym));
-    const mClients=[...new Set(mRegs.map(r=>r.client.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'da'));
-    if(!mClients.length) return;
-    const rows=[['Dato',...mClients.map(safeCell),'Total']];
-    const lastCol=colLetter(1+mClients.length), totCol=colLetter(2+mClients.length);
-    for(let d=1;d<=days;d++){
-      const rIdx=d+1, ds=`${ym}-${String(d).padStart(2,'0')}`, rv=[ds];
-      mClients.forEach(c=>{const sum=mRegs.filter(r=>r.date===ds&&r.client.trim()===c).reduce((a,x)=>a+(x.duration||0),0);rv.push(sum>0?sum:'');});
-      rv.push(`=SUM(B${rIdx}:${lastCol}${rIdx})`); rows.push(rv);
-    }
-    const bottom=['TOTAL'];
-    for(let c=0;c<mClients.length;c++){const cl=colLetter(2+c);bottom.push(`=SUM(${cl}2:${cl}${days+1})`);}
-    bottom.push(`=SUM(${totCol}2:${totCol}${days+1})`); rows.push(bottom);
-    data.push({range:`'${name}'!A1:${totCol}${rows.length}`,majorDimension:'ROWS',values:rows});
-  });
-
+ 
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
-    {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});
-
-  // light formatting: header rows + frozen
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});
+ 
   const fmt=[];
-  const headerFmt=(sid,cols,color)=>{
-    fmt.push({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
-    fmt.push({repeatCell:{range:{sheetId:sid,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:cols},
-      cell:{userEnteredFormat:{backgroundColor:color,textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true,fontSize:10},horizontalAlignment:'CENTER'}},
+  const allSid=finalMap.get('Alle Registreringer');
+  if(allSid!==undefined){
+    fmt.push({updateSheetProperties:{properties:{sheetId:allSid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
+    fmt.push({repeatCell:{range:{sheetId:allSid,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:7},
+      cell:{userEnteredFormat:{backgroundColor:{red:45/255,green:55/255,blue:72/255},textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true,fontSize:10},horizontalAlignment:'CENTER'}},
       fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}});
-  };
-  if(finalMap.has('Alle Registreringer')) headerFmt(finalMap.get('Alle Registreringer'),7,{red:45/255,green:55/255,blue:72/255});
-  clients.forEach(c=>{const sid=finalMap.get(safeSheetName(c));if(sid!==undefined)headerFmt(sid,6,{red:30/255,green:58/255,blue:138/255});});
-  months.forEach(ym=>{const sid=finalMap.get(monthSheetName(ym));if(sid!==undefined)headerFmt(sid,3,{red:4/255,green:120/255,blue:87/255});});
+  }
+  Object.keys(tabMeta).forEach(name=>{const sid=finalMap.get(name);if(sid!==undefined)applyTabFmt(fmt,sid,tabMeta[name]);});
   if(fmt.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:fmt})}).catch(()=>{});
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:fmt})}).catch(e=>console.warn('Format skip:',e));
 }
-
+ 
 // ---------- Connect flow ----------
 async function connect(){
   if(!settings.clientId){ openSettings(); setError('Indtast et Google OAuth Client-ID under Indstillinger for at forbinde.'); return; }
@@ -549,7 +629,7 @@ function updateSheetLink(){
   if(sheetId){ a.href=`https://docs.google.com/spreadsheets/d/${sheetId}/edit`; a.classList.remove('hidden'); }
   else a.classList.add('hidden');
 }
-
+ 
 // ============================================================
 //  Gemini (browser, user's own key)
 // ============================================================
@@ -583,7 +663,7 @@ Brugerens nuværende tidspunkt: ${new Date().toISOString()}`;
   const parsed=JSON.parse(out.trim());
   return (parsed.results||[]).map(validateParsed);
 }
-
+ 
 // ============================================================
 //  Voice (Web Speech API)
 // ============================================================
@@ -622,7 +702,7 @@ function startListening(){
   }catch(err){ setVoice('error'); $('voiceStatus').textContent='Kunne ikke starte mikrofonen.'; }
 }
 function stopListening(){ if(recognition){try{recognition.stop();}catch(e){}} listening=false; }
-
+ 
 // ============================================================
 //  Drafts (AI results awaiting confirmation)
 // ============================================================
@@ -650,7 +730,7 @@ function renderDrafts(){
     all.onclick=addAllDrafts; head.appendChild(all);
   }
   box.appendChild(head);
-
+ 
   drafts.forEach((d,idx)=>{
     const el=document.createElement('div'); el.className='draft';
     el.style.borderColor='var(--indigo)';
@@ -676,7 +756,7 @@ function renderDrafts(){
     });
     box.appendChild(el);
   });
-
+ 
   box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
     const i=+b.dataset.add; const v=validateParsed(drafts[i]);
     if(!v.activity){ setError('Aktivitet er påkrævet.'); return; }
@@ -685,12 +765,12 @@ function renderDrafts(){
   });
   box.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{const i=+b.dataset.skip;drafts.splice(i,1);renderDrafts();if(!drafts.length)$('parseInfo').textContent='';});
 }
-
+ 
 // ============================================================
 //  Rendering
 // ============================================================
 function renderAll(){ renderList(); renderDashboard(); updateSheetLink(); }
-
+ 
 function renderList(){
   $('regCount').textContent=regs.length;
   // filter chips
@@ -723,7 +803,7 @@ function renderList(){
   list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm('Slet denne registrering?')) deleteRegistration(b.dataset.del); });
   list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editInline(b.dataset.edit));
 }
-
+ 
 function editInline(id){
   const r=regs.find(x=>x.id===id); if(!r)return;
   const client=prompt('Kunde/Projekt:',r.client); if(client===null)return;
@@ -733,7 +813,7 @@ function editInline(id){
   const v=validateParsed({client,activity,duration:dur,category:r.category,date});
   updateRegistration(id,v);
 }
-
+ 
 function renderDashboard(){
   const total=regs.reduce((a,r)=>a+(r.duration||0),0);
   $('statTotal').textContent=total.toLocaleString('da-DK',{maximumFractionDigits:2});
@@ -743,7 +823,7 @@ function renderDashboard(){
   const now=new Date(); const day=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-day); monday.setHours(0,0,0,0);
   const week=regs.filter(r=>{const d=new Date(r.date);return d>=monday;}).reduce((a,r)=>a+(r.duration||0),0);
   $('statWeek').textContent=week.toLocaleString('da-DK',{maximumFractionDigits:2});
-
+ 
   // donut by category
   const byCat={}; CATEGORIES.forEach(c=>byCat[c]=0); regs.forEach(r=>{byCat[r.category]=(byCat[r.category]||0)+(r.duration||0);});
   const cats=CATEGORIES.filter(c=>byCat[c]>0);
@@ -766,7 +846,7 @@ function renderDashboard(){
   if(!cats.length){ leg.innerHTML='<span class="muted small">Ingen data endnu.</span>'; }
   cats.forEach(c=>{const row=document.createElement('div');row.className='legrow';
     row.innerHTML=`<span class="swatch" style="background:${CAT_COLORS[c]}"></span><span style="flex:1">${esc(c)}</span><span class="muted">${byCat[c].toLocaleString('da-DK',{maximumFractionDigits:2})} t</span>`;leg.appendChild(row);});
-
+ 
   // client bars
   const byClient={}; regs.forEach(r=>{const c=r.client.trim()||'(uden kunde)';byClient[c]=(byClient[c]||0)+(r.duration||0);});
   const sorted=Object.entries(byClient).sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -777,7 +857,7 @@ function renderDashboard(){
     d.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:5px"><span class="small">${esc(c)}</span><span class="small muted">${v.toLocaleString('da-DK',{maximumFractionDigits:2})} t</span></div>
       <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100)}%;background:${['#6366f1','#10b981','#fbbf24','#22d3ee','#a78bfa','#f43f5e'][i%6]}"></div></div>`;cb.appendChild(d);});
 }
-
+ 
 // ============================================================
 //  Settings UI
 // ============================================================
@@ -796,18 +876,18 @@ function saveSettingsUI(){
   $('settingsPanel').classList.add('hidden');
   setSync(connected()?'Forbundet — klar':'Gemmer lokalt i din browser', connected()?'on':'');
 }
-
+ 
 // ============================================================
 //  Wire up
 // ============================================================
 function initSelect(){ const s=$('mCategory'); CATEGORIES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);}); }
-
+ 
 function bind(){
   $('micBtn').onclick=()=> listening?stopListening():startListening();
   $('settingsBtn').onclick=openSettings;
   $('saveSettings').onclick=saveSettingsUI;
   $('connectBtn').onclick=connect;
-  $('syncBtn').onclick=()=>{ if(connected()) flushSync(); else connect(); };
+  $('syncBtn').onclick=()=>{ if(connected()){ dirty=true; flushSync(); } else connect(); };
   $('newSheetBtn').onclick=createNewSheet;
   $('linkSheetBtn').onclick=linkManualSheet;
   $('openSheet');
@@ -827,7 +907,7 @@ function bind(){
     $('mClient').value='';$('mActivity').value='';$('mDuration').value='';$('mCategory').value='Udvikling';$('mDate').value=todayStr();
   };
 }
-
+ 
 function boot(){
   // migrate old "Møde" category -> "Mødetid"
   let migrated=false;
