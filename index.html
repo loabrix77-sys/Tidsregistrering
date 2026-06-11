@@ -241,7 +241,7 @@
    ============================================================ */
  
 const LS = {
-  regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1'
+  regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1', deleted:'orbit_deleted_v1'
 };
 const CATEGORIES = ['Udvikling','Rådgivning','Strategi','Mødetid','Undervisning','Facilitering','Design','Support','Administration','Planlægning','Andet'];
 const CAT_COLORS = {Udvikling:'#10b981','Rådgivning':'#0ea5e9',Strategi:'#8b5cf6','Mødetid':'#f59e0b',Undervisning:'#ec4899',Facilitering:'#14b8a6',Design:'#6366f1',Support:'#06b6d4',Administration:'#a78bfa','Planlægning':'#e11d48',Andet:'#71717a'};
@@ -249,6 +249,7 @@ const DK_MONTHS = ['Januar','Februar','Marts','April','Maj','Juni','Juli','Augus
  
 // ---------- State ----------
 let regs = load(LS.regs, []);
+let deletedIds = load(LS.deleted, []); // tombstones {id, deletedAt} so deletions propagate across devices
 let settings = load(LS.settings, {geminiKey:'',geminiModel:'gemini-2.5-flash',clientId:''});
 let sheetId = load(LS.sheet, null);
 let accessToken = null, tokenExpiry = 0, tokenClient = null;
@@ -303,15 +304,16 @@ function setSync(msg, state){ // state: '', 'on', 'warn'
 //  CRUD + autosave
 // ============================================================
 function addRegistrations(items){ // items already validated {client,activity,duration,category,date}
-  const created = items.map(r=>({...r, id:uuid(), createdAt:new Date().toISOString(), synced:false}));
+  const created = items.map(r=>{const t=new Date().toISOString();return {...r, id:uuid(), createdAt:t, updatedAt:t, synced:false};});
   regs = [...created, ...regs];
   persistAndSchedule();
 }
 function updateRegistration(id, fields){
-  regs = regs.map(r=> r.id===id ? {...r,...fields,synced:false} : r);
+  regs = regs.map(r=> r.id===id ? {...r,...fields,updatedAt:new Date().toISOString(),synced:false} : r);
   persistAndSchedule();
 }
 function deleteRegistration(id){
+  if(regs.some(r=>r.id===id)){ deletedIds.push({id, deletedAt:new Date().toISOString()}); save(LS.deleted, deletedIds); }
   regs = regs.filter(r=>r.id!==id);
   persistAndSchedule();
 }
@@ -337,9 +339,8 @@ function flushSync(){
   if(!connected() || !dirty) return;
   dirty = false;
   setSync('Synkroniserer...','warn');
-  syncQueue = syncQueue.then(()=>doSync(regs.slice())).then(()=>{
-    regs = regs.map(r=>({...r,synced:true}));
-    save(LS.regs, regs); renderList(); renderDashboard();
+  syncQueue = syncQueue.then(()=>doSync()).then(()=>{
+    renderList(); renderDashboard();
     setSync('Synkroniseret med Google Sheets', 'on');
     setError('');
   }).catch(err=>{
@@ -515,8 +516,23 @@ function applyTabFmt(fmt,sid,m){
   widths.forEach((w,i)=>fmt.push({updateDimensionProperties:{range:{sheetId:sid,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w},fields:'pixelSize'}}));
 }
  
-// ---------- Full sync (per-client × month, injection-guarded) ----------
-async function doSync(registrations){
+// ---------- Merge local + remote (multi-device safe) ----------
+function mergeRegs(localRegs, localDeleted, remoteRegs, remoteDeleted){
+  const delMap=new Map();
+  [...(localDeleted||[]), ...(remoteDeleted||[])].forEach(d=>{ if(d&&d.id){ const ex=delMap.get(d.id); if(!ex || String(d.deletedAt||'')>String(ex.deletedAt||'')) delMap.set(d.id,d); } });
+  const byId=new Map();
+  const consider=r=>{ if(!r||!r.id) return; const ex=byId.get(r.id); const ru=String(r.updatedAt||r.createdAt||''); const eu=ex?String(ex.updatedAt||ex.createdAt||''):''; if(!ex || ru>=eu) byId.set(r.id,r); };
+  (remoteRegs||[]).forEach(consider);
+  (localRegs||[]).forEach(consider);
+  // a registration edited AFTER its deletion wins (drops the tombstone); otherwise the deletion wins
+  delMap.forEach((d,id)=>{ const r=byId.get(id); if(r){ const ru=String(r.updatedAt||r.createdAt||''); if(ru>String(d.deletedAt||'')) delMap.delete(id); else byId.delete(id); } });
+  const merged=[...byId.values()].map(r=>({id:String(r.id),date:r.date||'',client:r.client||'',activity:r.activity||'',duration:Number(r.duration)||0,category:r.category||'Andet',createdAt:r.createdAt||'',updatedAt:r.updatedAt||r.createdAt||'',synced:true}));
+  merged.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  return {merged, deleted:[...delMap.values()]};
+}
+ 
+// ---------- Full sync (merge-based, per-client × month, injection-guarded) ----------
+async function doSync(){
   const token=await ensureToken();
   const id=sheetId;
   const today=todayStr();
@@ -524,26 +540,42 @@ async function doSync(registrations){
  
   const meta=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
   const sheets=meta.sheets||[];
- 
-  if(registrations.length===0){
-    const ranges=sheets.map(s=>`'${s.properties.title}'!A1:Z1000`);
-    if(ranges.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
-      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges})});
-    return;
-  }
- 
   const sheetsMap=new Map(); sheets.forEach(s=>sheetsMap.set(s.properties.title,s.properties.sheetId));
  
-  const desired=new Set(['Alle Registreringer']);
-  const data=[]; const tabMeta={};
+  // 1. read the canonical store already in the sheet (written by any device)
+  let remoteRegs=[], remoteDeleted=[];
+  const readRanges=[];
+  if(sheetsMap.has('_Data')) readRanges.push("'_Data'!A2:H");
+  if(sheetsMap.has('_Slettede')) readRanges.push("'_Slettede'!A2:B");
+  if(readRanges.length){
+    const qs=readRanges.map(r=>'ranges='+encodeURIComponent(r)).join('&');
+    const got=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet?${qs}&valueRenderOption=UNFORMATTED_VALUE`);
+    (got.valueRanges||[]).forEach(vr=>{
+      const rows=vr.values||[];
+      if(String(vr.range||'').indexOf('_Data')>=0) remoteRegs=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),date:String(r[1]||''),client:String(r[2]||''),activity:String(r[3]||''),duration:Number(r[4])||0,category:String(r[5]||'Andet'),createdAt:String(r[6]||''),updatedAt:String(r[7]||r[6]||'')}));
+      else if(String(vr.range||'').indexOf('_Slettede')>=0) remoteDeleted=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),deletedAt:String(r[1]||'')}));
+    });
+  }
  
-  const raw=[...registrations].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  // 2. merge against the local snapshot
+  const localSnap=regs.slice(), delSnap=deletedIds.slice();
+  const {merged, deleted}=mergeRegs(localSnap, delSnap, remoteRegs, remoteDeleted);
+  const registrations=merged;
+ 
+  // 3. desired tabs + values
+  const desired=new Set(['Alle Registreringer','_Data','_Slettede']);
+  const data=[]; const dataRaw=[]; const tabMeta={};
+ 
+  dataRaw.push({range:`'_Data'!A1:H${merged.length+1}`,majorDimension:'ROWS',values:[['id','date','client','activity','duration','category','createdAt','updatedAt'],...merged.map(r=>[r.id,r.date,r.client,r.activity,r.duration,r.category,r.createdAt,r.updatedAt])]});
+  dataRaw.push({range:`'_Slettede'!A1:B${deleted.length+1}`,majorDimension:'ROWS',values:[['id','deletedAt'],...deleted.map(d=>[d.id,d.deletedAt])]});
+ 
+  const rawSorted=[...registrations].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
   const rawRows=[['ID','Dato','Kunde/Projekt','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den'],
-    ...raw.map(r=>[r.id,r.date,safeCell(r.client),safeCell(r.activity),r.duration,safeCell(r.category),syncTime])];
+    ...rawSorted.map(r=>[r.id,r.date,safeCell(r.client),safeCell(r.activity),r.duration,safeCell(r.category),syncTime])];
   data.push({range:`'Alle Registreringer'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
  
   const combos=new Map();
-  registrations.forEach(r=>{const cl=r.client.trim();const ym=(r.date||'').slice(0,7);if(!cl||!ym)return;const name=clientMonthTab(cl,ym);if(!combos.has(name))combos.set(name,{client:cl,ym});});
+  registrations.forEach(r=>{const cl=(r.client||'').trim();const ym=(r.date||'').slice(0,7);if(!cl||!ym)return;const name=clientMonthTab(cl,ym);if(!combos.has(name))combos.set(name,{client:cl,ym});});
   [...combos.entries()].sort((a,b)=>a[0].localeCompare(b[0],'da')).forEach(([name,info])=>{
     desired.add(name);
     const built=targetFor(info.client)?buildTargetTab(info.client,info.ym,registrations,today):buildPlainTab(info.client,info.ym,registrations);
@@ -551,6 +583,7 @@ async function doSync(registrations){
     data.push({range:`'${name}'!A1:${colLetter(built.meta.cols)}${built.rows.length}`,majorDimension:'ROWS',values:built.rows});
   });
  
+  // 4. structural alignment
   const requests=[];
   const defaults=['Sheet1','Ark1','Blad1','Sheet 1','Ark 1'];
   if(!sheetsMap.has('Alle Registreringer')){
@@ -560,7 +593,7 @@ async function doSync(registrations){
     if(renId!==null){requests.push({updateSheetProperties:{properties:{sheetId:renId,title:'Alle Registreringer'},fields:'title'}});sheetsMap.set('Alle Registreringer',renId);sheetsMap.delete(renTitle);}
   }
   desired.forEach(t=>{if(!sheetsMap.has(t))requests.push({addSheet:{properties:{title:t}}});});
-  const skip=new Set([...defaults,'Alle Registreringer']);
+  const skip=new Set([...defaults,'Alle Registreringer','_Data','_Slettede']);
   sheetsMap.forEach((sid,t)=>{if(!desired.has(t)&&!skip.has(t))requests.push({deleteSheet:{sheetId:sid}});});
   if(requests.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests})});
@@ -568,14 +601,27 @@ async function doSync(registrations){
   const meta2=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
   const finalMap=new Map(); (meta2.sheets||[]).forEach(s=>finalMap.set(s.properties.title,s.properties.sheetId));
  
+  // 5. clear + write (RAW canonical store, USER_ENTERED presentation)
   const clearRanges=[...desired].map(t=>`'${t}'!A1:Z1000`);
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges:clearRanges})});
- 
+  await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'RAW',data:dataRaw})});
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});
  
+  // 6. commit locally (fold in anything added/deleted while we were writing)
+  const mergedIds=new Set(merged.map(r=>r.id));
+  const newTomb=deletedIds.filter(d=>!deleted.some(x=>x.id===d.id));
+  const delIdSet=new Set([...deleted,...newTomb].map(d=>d.id));
+  const extra=regs.filter(r=>!mergedIds.has(r.id)&&!delIdSet.has(r.id));
+  regs=[...extra,...merged.filter(r=>!delIdSet.has(r.id))]; save(LS.regs,regs);
+  deletedIds=[...deleted,...newTomb]; save(LS.deleted,deletedIds);
+  if(extra.length||newTomb.length){ dirty=true; clearTimeout(debounceTimer); debounceTimer=setTimeout(flushSync,2500); }
+ 
+  // 7. formatting (+ hide the helper tabs)
   const fmt=[];
+  ['_Data','_Slettede'].forEach(t=>{const sid=finalMap.get(t);if(sid!==undefined)fmt.push({updateSheetProperties:{properties:{sheetId:sid,hidden:true},fields:'hidden'}});});
   const allSid=finalMap.get('Alle Registreringer');
   if(allSid!==undefined){
     fmt.push({updateSheetProperties:{properties:{sheetId:allSid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
@@ -600,8 +646,8 @@ async function connect(){
     sheetId=id; save(LS.sheet,id);
     updateSheetLink();
     setSync('Synkroniserer...','warn');
-    await syncQueue.then(()=>doSync(regs.slice()));
-    regs=regs.map(r=>({...r,synced:true})); save(LS.regs,regs); renderList();
+    await syncQueue.then(()=>doSync());
+    renderList(); renderDashboard();
     setSync('Synkroniseret med Google Sheets','on');
   }catch(err){ console.error(err); setError(err.message||'Forbindelse mislykkedes.'); setSync('Ikke forbundet','warn'); }
 }
@@ -612,8 +658,8 @@ async function createNewSheet(){
     const token=await ensureToken();
     const id=await createSpreadsheet(token);
     sheetId=id; save(LS.sheet,id); updateSheetLink();
-    await syncQueue.then(()=>doSync(regs.slice()));
-    regs=regs.map(r=>({...r,synced:true})); save(LS.regs,regs); renderList();
+    await syncQueue.then(()=>doSync());
+    renderList(); renderDashboard();
     setSync('Nyt ark oprettet og synkroniseret','on');
   }catch(err){ setError(err.message); setSync('Fejl','warn'); }
 }
@@ -909,9 +955,14 @@ function bind(){
 }
  
 function boot(){
-  // migrate old "Møde" category -> "Mødetid"
+  // migrate: old "Møde" category -> "Mødetid"; ensure every reg has updatedAt (for multi-device merge)
   let migrated=false;
-  regs=regs.map(r=>{ if(r.category==='Møde'){migrated=true; return {...r,category:'Mødetid'};} return r; });
+  regs=regs.map(r=>{
+    let n=r;
+    if(n.category==='Møde'){migrated=true; n={...n,category:'Mødetid'};}
+    if(!n.updatedAt){migrated=true; n={...n,updatedAt:n.createdAt||new Date().toISOString()};}
+    return n;
+  });
   if(migrated){ save(LS.regs,regs); scheduleSync(); }
   initSelect(); bind(); loadSettingsUI();
   $('mDate').value=todayStr();
