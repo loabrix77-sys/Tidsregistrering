@@ -106,7 +106,7 @@
 <body>
 <div class="glow"></div>
 <div class="wrap">
- 
+
   <header>
     <div class="brand">
       <div class="logo"><span></span></div>
@@ -123,7 +123,7 @@
       <button id="settingsBtn" class="icon-btn" title="Indstillinger">⚙</button>
     </div>
   </header>
- 
+
   <!-- Settings -->
   <div id="settingsPanel" class="card hidden">
     <div class="eyebrow">Indstillinger</div>
@@ -156,9 +156,9 @@
       </div>
     </div>
   </div>
- 
+
   <div id="errorBox" class="alert err hidden"><span>⚠</span><div id="errorText"></div></div>
- 
+
   <!-- Input row -->
   <div class="grid2">
     <!-- Voice -->
@@ -172,12 +172,12 @@
       </div>
       <div id="transcriptBox" class="draft hidden"><span class="xsmall mono muted">Transkription:</span><div id="transcriptText" style="font-style:italic;margin-top:4px"></div></div>
     </div>
- 
+
     <!-- Manual / quick parse -->
     <div class="card">
       <div class="eyebrow">Registrering</div>
       <div class="card-title">Tilføj tidsregistrering</div>
- 
+
       <div style="margin-top:14px">
         <label class="fl">Hurtig AI-tekst (valgfri)</label>
         <div class="row">
@@ -186,9 +186,9 @@
         <button id="parseBtn" class="btn btn-ghost" style="margin-top:8px;width:100%">✨ Tolk med AI</button>
         <div id="parseInfo" class="xsmall muted" style="margin-top:6px"></div>
       </div>
- 
+
       <div id="draftsBox"></div>
- 
+
       <div class="sep"></div>
       <form id="manualForm">
         <div class="grid2" style="gap:12px">
@@ -204,7 +204,7 @@
       </form>
     </div>
   </div>
- 
+
   <!-- List -->
   <div class="card">
     <div class="row wrap" style="align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -214,7 +214,7 @@
     <div id="catFilter" class="row wrap" style="margin-bottom:14px;gap:7px"></div>
     <div id="regList"></div>
   </div>
- 
+
   <!-- Dashboard -->
   <div class="grid-stats" style="margin-bottom:20px">
     <div class="stat"><div class="l">Total timer</div><div class="n" id="statTotal">0</div></div>
@@ -230,23 +230,23 @@
       <div id="clientBars"></div>
     </div>
   </div>
- 
+
 </div>
- 
+
 <script>
 "use strict";
 /* ============================================================
    OrbitAI — single-file time tracker
    Offline-first (localStorage) · Gemini (own key) · Google Sheets
    ============================================================ */
- 
+
 const LS = {
   regs:'orbit_regs_v1', settings:'orbit_settings_v1', sheet:'orbit_sheet_v1', deleted:'orbit_deleted_v1'
 };
 const CATEGORIES = ['Udvikling','Rådgivning','Strategi','Mødetid','Undervisning','Facilitering','Design','Support','Administration','Planlægning','Andet'];
 const CAT_COLORS = {Udvikling:'#10b981','Rådgivning':'#0ea5e9',Strategi:'#8b5cf6','Mødetid':'#f59e0b',Undervisning:'#ec4899',Facilitering:'#14b8a6',Design:'#6366f1',Support:'#06b6d4',Administration:'#a78bfa','Planlægning':'#e11d48',Andet:'#71717a'};
 const DK_MONTHS = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
- 
+
 // ---------- State ----------
 let regs = load(LS.regs, []);
 let deletedIds = load(LS.deleted, []); // tombstones {id, deletedAt} so deletions propagate across devices
@@ -255,11 +255,11 @@ let sheetId = load(LS.sheet, null);
 let accessToken = null, tokenExpiry = 0, tokenClient = null;
 let drafts = [];
 let searchTerm = '', catFilterVal = 'Alle';
- 
+
 // sync control
 let dirty = false, debounceTimer = null;
 let syncQueue = Promise.resolve();
- 
+
 // ---------- Helpers ----------
 function load(k,def){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):def;}catch(e){return def;} }
 function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
@@ -268,7 +268,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function uuid(){return (crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36);}
 function connected(){return Boolean(sheetId && settings.clientId);}
- 
+
 /* Guard against spreadsheet formula injection: any text starting with
    = + - @ (or control chars) is prefixed with an apostrophe so Sheets
    stores it as literal text instead of evaluating it as a formula. */
@@ -277,7 +277,7 @@ function safeCell(v){
   if(/^[=+\-@\t\r]/.test(v)) return "'"+v;
   return v;
 }
- 
+
 /* Validate anything coming from the AI before it touches state/sheet. */
 function validateParsed(r){
   const category = CATEGORIES.includes(r && r.category) ? r.category : 'Andet';
@@ -288,7 +288,7 @@ function validateParsed(r){
   const activity = String((r&&r.activity)||'').slice(0,500);
   return {client, activity, duration, category, date};
 }
- 
+
 function setError(msg){
   const box=$('errorBox');
   if(!msg){box.classList.add('hidden');return;}
@@ -299,7 +299,7 @@ function setSync(msg, state){ // state: '', 'on', 'warn'
   $('syncMsg').textContent = msg;
   const dot=$('syncDot'); dot.className='dot'+(state?(' '+state):'');
 }
- 
+
 // ============================================================
 //  CRUD + autosave
 // ============================================================
@@ -322,7 +322,7 @@ function persistAndSchedule(){
   renderAll();
   scheduleSync();
 }
- 
+
 function scheduleSync(){
   if(!connected()){ if(regs.some(r=>!r.synced)) setSync('Gemt lokalt — afventer forbindelse','warn'); return; }
   dirty = true;
@@ -334,7 +334,7 @@ function scheduleSync(){
 setInterval(()=>{ if(dirty && connected()) flushSync(); }, 30000);
 // flush on tab close
 window.addEventListener('beforeunload',(e)=>{ if(dirty && connected()){ /* best-effort */ } });
- 
+
 function flushSync(){
   if(!connected() || !dirty) return;
   dirty = false;
@@ -351,7 +351,7 @@ function flushSync(){
   });
   return syncQueue;
 }
- 
+
 // ============================================================
 //  Google Identity Services — OAuth token
 // ============================================================
@@ -379,7 +379,7 @@ function ensureToken(){
     catch(e){ reject(e); }
   });
 }
- 
+
 // ---------- Sheets REST ----------
 async function gfetch(token,url,opts){
   const r = await fetch(url,{...opts, headers:{Authorization:'Bearer '+token, ...(opts&&opts.headers)}});
@@ -411,7 +411,7 @@ function fmtH(n){return Number(n||0).toLocaleString('da-DK',{minimumFractionDigi
 function statusKind(diff,started){if(!started)return 'future';if(diff>0.05)return 'good';if(diff<-0.05)return 'bad';return 'neutral';}
 function statusLabel(diff,started){if(!started)return 'kommende';if(diff>0.05)return `+${fmtH(diff)} foran`;if(diff<-0.05)return `−${fmtH(Math.abs(diff))} bagud`;return '±0 i mål';}
 function barText(val,max){const n=20;const f=Math.max(0,Math.min(n,Math.round((val/max)*n)));return '█'.repeat(f)+'░'.repeat(n-f);}
- 
+
 function buildWeeks(ym,regs,target,today){
   const y=+ym.slice(0,4),m=+ym.slice(5,7),days=new Date(y,m,0).getDate();
   const byWeek=new Map();
@@ -426,17 +426,18 @@ function buildWeeks(ym,regs,target,today){
     w.started=(`${ym}-${String(w.first).padStart(2,'0')}`)<=today;w.diff=Math.round((w.cum-w.expected)*10)/10;});
   return {arr,days};
 }
- 
+
 function buildTargetTab(client,ym,registrations,today){
   const target=targetFor(client);
   const monShort=DK_MON_SHORT[+ym.slice(5,7)-1];
   const title=`${client} · ${monShort} ${ym.slice(0,4)}`;
-  const monthRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(ym))
+  const clLow=client.toLowerCase();
+  const monthRegs=registrations.filter(r=>(r.client||'').trim().toLowerCase()===clLow&&(r.date||'').startsWith(ym))
     .sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.createdAt.localeCompare(b.createdAt));
   const total=Math.round(monthRegs.reduce((a,r)=>a+(r.duration||0),0)*100)/100;
   const {arr,days}=buildWeeks(ym,monthRegs,target,today);
   const prev=prevYm(ym);
-  const prevRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(prev));
+  const prevRegs=registrations.filter(r=>(r.client||'').trim().toLowerCase()===clLow&&(r.date||'').startsWith(prev));
   let carryText='ingen data fra sidste måned';
   if(prevRegs.length){const pt=Math.round(prevRegs.reduce((a,r)=>a+(r.duration||0),0)*100)/100;const c=Math.round((pt-target)*10)/10;carryText=(c>=0?'+':'−')+fmtH(Math.abs(c))+(c>=0?' t (overskud)':' t (underskud)');}
   const curYm=today.slice(0,7);let elapsed;
@@ -478,11 +479,12 @@ function buildTargetTab(client,ym,registrations,today){
   if(monthRegs.length){rows.push(['I alt','',`=SUM(C${regStart+1}:C${regEnd})`,'','','']);meta.totalRows.push(regEnd);meta.numRanges.push({r0:regStart,r1:regEnd+1,c0:2,c1:3});}
   return {rows,meta};
 }
- 
+
 function buildPlainTab(client,ym,registrations){
   const monShort=DK_MON_SHORT[+ym.slice(5,7)-1];
   const title=`${client} · ${monShort} ${ym.slice(0,4)}`;
-  const monthRegs=registrations.filter(r=>r.client.trim()===client&&(r.date||'').startsWith(ym))
+  const clLow=client.toLowerCase();
+  const monthRegs=registrations.filter(r=>(r.client||'').trim().toLowerCase()===clLow&&(r.date||'').startsWith(ym))
     .sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):a.createdAt.localeCompare(b.createdAt));
   const rows=[];const meta={cols:4,type:'plain',headerRows:[],totalRows:[],statusCells:[],numRanges:[]};
   rows.push([title,'','','']);
@@ -495,7 +497,7 @@ function buildPlainTab(client,ym,registrations){
   if(monthRegs.length){rows.push(['I alt','',`=SUM(C${regStart+1}:C${regEnd})`,'']);meta.totalRows.push(regEnd);meta.numRanges.push({r0:regStart,r1:regEnd+1,c0:2,c1:3});}
   return {rows,meta};
 }
- 
+
 function applyTabFmt(fmt,sid,m){
   const white={red:1,green:1,blue:1};
   fmt.push({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
@@ -515,7 +517,7 @@ function applyTabFmt(fmt,sid,m){
   const widths=m.type==='target'?[170,150,130,140,120,150]:[120,300,130,150];
   widths.forEach((w,i)=>fmt.push({updateDimensionProperties:{range:{sheetId:sid,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w},fields:'pixelSize'}}));
 }
- 
+
 // ---------- Merge local + remote (multi-device safe) ----------
 function mergeRegs(localRegs, localDeleted, remoteRegs, remoteDeleted){
   const delMap=new Map();
@@ -524,93 +526,101 @@ function mergeRegs(localRegs, localDeleted, remoteRegs, remoteDeleted){
   const consider=r=>{ if(!r||!r.id) return; const ex=byId.get(r.id); const ru=String(r.updatedAt||r.createdAt||''); const eu=ex?String(ex.updatedAt||ex.createdAt||''):''; if(!ex || ru>=eu) byId.set(r.id,r); };
   (remoteRegs||[]).forEach(consider);
   (localRegs||[]).forEach(consider);
-  // a registration edited AFTER its deletion wins (drops the tombstone); otherwise the deletion wins
   delMap.forEach((d,id)=>{ const r=byId.get(id); if(r){ const ru=String(r.updatedAt||r.createdAt||''); if(ru>String(d.deletedAt||'')) delMap.delete(id); else byId.delete(id); } });
   const merged=[...byId.values()].map(r=>({id:String(r.id),date:r.date||'',client:r.client||'',activity:r.activity||'',duration:Number(r.duration)||0,category:r.category||'Andet',createdAt:r.createdAt||'',updatedAt:r.updatedAt||r.createdAt||'',synced:true}));
   merged.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   return {merged, deleted:[...delMap.values()]};
 }
- 
-// ---------- Full sync (merge-based, per-client × month, injection-guarded) ----------
+
+// ---------- Full sync (merge-based, per-client × month, case-insensitive tabs) ----------
 async function doSync(){
   const token=await ensureToken();
   const id=sheetId;
   const today=todayStr();
   const syncTime=new Date().toLocaleString('da-DK');
- 
+
   const meta=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
   const sheets=meta.sheets||[];
-  const sheetsMap=new Map(); sheets.forEach(s=>sheetsMap.set(s.properties.title,s.properties.sheetId));
- 
-  // 1. read the canonical store already in the sheet (written by any device)
+  // case-insensitive index of existing tabs (Sheets treats names case-insensitively for uniqueness)
+  const lc=new Map(); sheets.forEach(s=>lc.set(s.properties.title.toLowerCase(),{title:s.properties.title,id:s.properties.sheetId}));
+  const titleOf=n=>(lc.get(n.toLowerCase())||{}).title||n;
+
+  // 1. read canonical store written by any device
   let remoteRegs=[], remoteDeleted=[];
   const readRanges=[];
-  if(sheetsMap.has('_Data')) readRanges.push("'_Data'!A2:H");
-  if(sheetsMap.has('_Slettede')) readRanges.push("'_Slettede'!A2:B");
+  if(lc.has('_data')) readRanges.push("'"+titleOf('_Data')+"'!A2:H");
+  if(lc.has('_slettede')) readRanges.push("'"+titleOf('_Slettede')+"'!A2:B");
   if(readRanges.length){
     const qs=readRanges.map(r=>'ranges='+encodeURIComponent(r)).join('&');
     const got=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet?${qs}&valueRenderOption=UNFORMATTED_VALUE`);
     (got.valueRanges||[]).forEach(vr=>{
-      const rows=vr.values||[];
-      if(String(vr.range||'').indexOf('_Data')>=0) remoteRegs=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),date:String(r[1]||''),client:String(r[2]||''),activity:String(r[3]||''),duration:Number(r[4])||0,category:String(r[5]||'Andet'),createdAt:String(r[6]||''),updatedAt:String(r[7]||r[6]||'')}));
-      else if(String(vr.range||'').indexOf('_Slettede')>=0) remoteDeleted=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),deletedAt:String(r[1]||'')}));
+      const rows=vr.values||[]; const rg=String(vr.range||'').toLowerCase();
+      if(rg.indexOf('_data')>=0) remoteRegs=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),date:String(r[1]||''),client:String(r[2]||''),activity:String(r[3]||''),duration:Number(r[4])||0,category:String(r[5]||'Andet'),createdAt:String(r[6]||''),updatedAt:String(r[7]||r[6]||'')}));
+      else if(rg.indexOf('_slettede')>=0) remoteDeleted=rows.filter(r=>r&&r[0]!==undefined&&r[0]!=='').map(r=>({id:String(r[0]),deletedAt:String(r[1]||'')}));
     });
   }
- 
-  // 2. merge against the local snapshot
+
+  // 2. merge against local snapshot
   const localSnap=regs.slice(), delSnap=deletedIds.slice();
   const {merged, deleted}=mergeRegs(localSnap, delSnap, remoteRegs, remoteDeleted);
   const registrations=merged;
- 
-  // 3. desired tabs + values
-  const desired=new Set(['Alle Registreringer','_Data','_Slettede']);
+
+  // 3. group client × month case-insensitively (canonical = first-seen casing)
+  const combos=new Map(); // lowerKey -> {client, ym}
+  registrations.forEach(r=>{const cl=(r.client||'').trim();const ym=(r.date||'').slice(0,7);if(!cl||!ym)return;const key=cl.toLowerCase()+'|'+ym;if(!combos.has(key))combos.set(key,{client:cl,ym});});
+  const comboList=[...combos.values()].map(info=>({info, name:clientMonthTab(info.client,info.ym)}))
+    .sort((a,b)=>a.name.localeCompare(b.name,'da'));
+
+  const wanted=['Alle Registreringer','_Data','_Slettede',...comboList.map(c=>c.name)];
+  const wantedLower=new Set(wanted.map(n=>n.toLowerCase()));
+
+  // 4. build values
   const data=[]; const dataRaw=[]; const tabMeta={};
- 
-  dataRaw.push({range:`'_Data'!A1:H${merged.length+1}`,majorDimension:'ROWS',values:[['id','date','client','activity','duration','category','createdAt','updatedAt'],...merged.map(r=>[r.id,r.date,r.client,r.activity,r.duration,r.category,r.createdAt,r.updatedAt])]});
-  dataRaw.push({range:`'_Slettede'!A1:B${deleted.length+1}`,majorDimension:'ROWS',values:[['id','deletedAt'],...deleted.map(d=>[d.id,d.deletedAt])]});
- 
+  dataRaw.push({range:`'${titleOf('_Data')}'!A1:H${merged.length+1}`,majorDimension:'ROWS',values:[['id','date','client','activity','duration','category','createdAt','updatedAt'],...merged.map(r=>[r.id,r.date,r.client,r.activity,r.duration,r.category,r.createdAt,r.updatedAt])]});
+  dataRaw.push({range:`'${titleOf('_Slettede')}'!A1:B${deleted.length+1}`,majorDimension:'ROWS',values:[['id','deletedAt'],...deleted.map(d=>[d.id,d.deletedAt])]});
+
   const rawSorted=[...registrations].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
   const rawRows=[['ID','Dato','Kunde/Projekt','Aktivitet','Varighed (Timer)','Kategori','Synkroniseret den'],
     ...rawSorted.map(r=>[r.id,r.date,safeCell(r.client),safeCell(r.activity),r.duration,safeCell(r.category),syncTime])];
-  data.push({range:`'Alle Registreringer'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
- 
-  const combos=new Map();
-  registrations.forEach(r=>{const cl=(r.client||'').trim();const ym=(r.date||'').slice(0,7);if(!cl||!ym)return;const name=clientMonthTab(cl,ym);if(!combos.has(name))combos.set(name,{client:cl,ym});});
-  [...combos.entries()].sort((a,b)=>a[0].localeCompare(b[0],'da')).forEach(([name,info])=>{
-    desired.add(name);
-    const built=targetFor(info.client)?buildTargetTab(info.client,info.ym,registrations,today):buildPlainTab(info.client,info.ym,registrations);
-    tabMeta[name]=built.meta;
-    data.push({range:`'${name}'!A1:${colLetter(built.meta.cols)}${built.rows.length}`,majorDimension:'ROWS',values:built.rows});
+  data.push({range:`'${titleOf('Alle Registreringer')}'!A1:G${rawRows.length}`,majorDimension:'ROWS',values:rawRows});
+
+  comboList.forEach(c=>{
+    const built=targetFor(c.info.client)?buildTargetTab(c.info.client,c.info.ym,registrations,today):buildPlainTab(c.info.client,c.info.ym,registrations);
+    tabMeta[c.name]=built.meta;
+    data.push({range:`'${titleOf(c.name)}'!A1:${colLetter(built.meta.cols)}${built.rows.length}`,majorDimension:'ROWS',values:built.rows});
   });
- 
-  // 4. structural alignment
+
+  // 5. structural alignment (all comparisons case-insensitive)
   const requests=[];
-  const defaults=['Sheet1','Ark1','Blad1','Sheet 1','Ark 1'];
-  if(!sheetsMap.has('Alle Registreringer')){
-    let renId=null,renTitle=null;
-    for(const n of defaults){if(sheetsMap.has(n)){renId=sheetsMap.get(n);renTitle=n;break;}}
-    if(renId===null && sheets.length){const t=sheets[0].properties.title; if(!desired.has(t)){renId=sheets[0].properties.sheetId;renTitle=t;}}
-    if(renId!==null){requests.push({updateSheetProperties:{properties:{sheetId:renId,title:'Alle Registreringer'},fields:'title'}});sheetsMap.set('Alle Registreringer',renId);sheetsMap.delete(renTitle);}
+  const defaultsLower=['sheet1','ark1','blad1','sheet 1','ark 1'];
+  if(!lc.has('alle registreringer')){
+    let ren=null;
+    for(const n of defaultsLower){ if(lc.has(n)){ren=lc.get(n);break;} }
+    if(!ren && sheets.length){ const t=sheets[0].properties.title; if(!wantedLower.has(t.toLowerCase())) ren={title:t,id:sheets[0].properties.sheetId}; }
+    if(ren){ requests.push({updateSheetProperties:{properties:{sheetId:ren.id,title:'Alle Registreringer'},fields:'title'}}); lc.set('alle registreringer',{title:'Alle Registreringer',id:ren.id}); lc.delete(ren.title.toLowerCase()); }
   }
-  desired.forEach(t=>{if(!sheetsMap.has(t))requests.push({addSheet:{properties:{title:t}}});});
-  const skip=new Set([...defaults,'Alle Registreringer','_Data','_Slettede']);
-  sheetsMap.forEach((sid,t)=>{if(!desired.has(t)&&!skip.has(t))requests.push({deleteSheet:{sheetId:sid}});});
+  wanted.forEach(n=>{ if(!lc.has(n.toLowerCase())) requests.push({addSheet:{properties:{title:n}}}); });
+  const skipLower=new Set([...defaultsLower,'alle registreringer','_data','_slettede']);
+  lc.forEach((info,lower)=>{ if(!wantedLower.has(lower)&&!skipLower.has(lower)) requests.push({deleteSheet:{sheetId:info.id}}); });
   if(requests.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests})});
- 
+
+  // refetch finalized ids (case-insensitive index)
   const meta2=await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties`);
-  const finalMap=new Map(); (meta2.sheets||[]).forEach(s=>finalMap.set(s.properties.title,s.properties.sheetId));
- 
-  // 5. clear + write (RAW canonical store, USER_ENTERED presentation)
-  const clearRanges=[...desired].map(t=>`'${t}'!A1:Z1000`);
+  const finalLc=new Map(); (meta2.sheets||[]).forEach(s=>finalLc.set(s.properties.title.toLowerCase(),{title:s.properties.title,id:s.properties.sheetId}));
+  const finalTitle=n=>(finalLc.get(n.toLowerCase())||{}).title||n;
+  const finalId=n=>(finalLc.get(n.toLowerCase())||{}).id;
+
+  // 6. clear + write (titleOf already yields the correct finalized titles)
+  const clearRanges=wanted.map(n=>`'${finalTitle(n)}'!A1:Z1000`);
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchClear`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ranges:clearRanges})});
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'RAW',data:dataRaw})});
   await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});
- 
-  // 6. commit locally (fold in anything added/deleted while we were writing)
+
+  // 7. commit locally (fold in anything added/deleted during the writes)
   const mergedIds=new Set(merged.map(r=>r.id));
   const newTomb=deletedIds.filter(d=>!deleted.some(x=>x.id===d.id));
   const delIdSet=new Set([...deleted,...newTomb].map(d=>d.id));
@@ -618,22 +628,22 @@ async function doSync(){
   regs=[...extra,...merged.filter(r=>!delIdSet.has(r.id))]; save(LS.regs,regs);
   deletedIds=[...deleted,...newTomb]; save(LS.deleted,deletedIds);
   if(extra.length||newTomb.length){ dirty=true; clearTimeout(debounceTimer); debounceTimer=setTimeout(flushSync,2500); }
- 
-  // 7. formatting (+ hide the helper tabs)
+
+  // 8. formatting (+ hide helper tabs) — non-fatal
   const fmt=[];
-  ['_Data','_Slettede'].forEach(t=>{const sid=finalMap.get(t);if(sid!==undefined)fmt.push({updateSheetProperties:{properties:{sheetId:sid,hidden:true},fields:'hidden'}});});
-  const allSid=finalMap.get('Alle Registreringer');
+  ['_Data','_Slettede'].forEach(t=>{const sid=finalId(t);if(sid!==undefined)fmt.push({updateSheetProperties:{properties:{sheetId:sid,hidden:true},fields:'hidden'}});});
+  const allSid=finalId('Alle Registreringer');
   if(allSid!==undefined){
     fmt.push({updateSheetProperties:{properties:{sheetId:allSid,gridProperties:{frozenRowCount:1}},fields:'gridProperties.frozenRowCount'}});
     fmt.push({repeatCell:{range:{sheetId:allSid,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:7},
       cell:{userEnteredFormat:{backgroundColor:{red:45/255,green:55/255,blue:72/255},textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true,fontSize:10},horizontalAlignment:'CENTER'}},
       fields:'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'}});
   }
-  Object.keys(tabMeta).forEach(name=>{const sid=finalMap.get(name);if(sid!==undefined)applyTabFmt(fmt,sid,tabMeta[name]);});
+  Object.keys(tabMeta).forEach(name=>{const sid=finalId(name);if(sid!==undefined)applyTabFmt(fmt,sid,tabMeta[name]);});
   if(fmt.length) await gfetch(token,`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:fmt})}).catch(e=>console.warn('Format skip:',e));
 }
- 
+
 // ---------- Connect flow ----------
 async function connect(){
   if(!settings.clientId){ openSettings(); setError('Indtast et Google OAuth Client-ID under Indstillinger for at forbinde.'); return; }
@@ -675,7 +685,7 @@ function updateSheetLink(){
   if(sheetId){ a.href=`https://docs.google.com/spreadsheets/d/${sheetId}/edit`; a.classList.remove('hidden'); }
   else a.classList.add('hidden');
 }
- 
+
 // ============================================================
 //  Gemini (browser, user's own key)
 // ============================================================
@@ -709,7 +719,7 @@ Brugerens nuværende tidspunkt: ${new Date().toISOString()}`;
   const parsed=JSON.parse(out.trim());
   return (parsed.results||[]).map(validateParsed);
 }
- 
+
 // ============================================================
 //  Voice (Web Speech API)
 // ============================================================
@@ -748,7 +758,7 @@ function startListening(){
   }catch(err){ setVoice('error'); $('voiceStatus').textContent='Kunne ikke starte mikrofonen.'; }
 }
 function stopListening(){ if(recognition){try{recognition.stop();}catch(e){}} listening=false; }
- 
+
 // ============================================================
 //  Drafts (AI results awaiting confirmation)
 // ============================================================
@@ -776,7 +786,7 @@ function renderDrafts(){
     all.onclick=addAllDrafts; head.appendChild(all);
   }
   box.appendChild(head);
- 
+
   drafts.forEach((d,idx)=>{
     const el=document.createElement('div'); el.className='draft';
     el.style.borderColor='var(--indigo)';
@@ -802,7 +812,7 @@ function renderDrafts(){
     });
     box.appendChild(el);
   });
- 
+
   box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
     const i=+b.dataset.add; const v=validateParsed(drafts[i]);
     if(!v.activity){ setError('Aktivitet er påkrævet.'); return; }
@@ -811,12 +821,12 @@ function renderDrafts(){
   });
   box.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{const i=+b.dataset.skip;drafts.splice(i,1);renderDrafts();if(!drafts.length)$('parseInfo').textContent='';});
 }
- 
+
 // ============================================================
 //  Rendering
 // ============================================================
 function renderAll(){ renderList(); renderDashboard(); updateSheetLink(); }
- 
+
 function renderList(){
   $('regCount').textContent=regs.length;
   // filter chips
@@ -849,7 +859,7 @@ function renderList(){
   list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(confirm('Slet denne registrering?')) deleteRegistration(b.dataset.del); });
   list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editInline(b.dataset.edit));
 }
- 
+
 function editInline(id){
   const r=regs.find(x=>x.id===id); if(!r)return;
   const client=prompt('Kunde/Projekt:',r.client); if(client===null)return;
@@ -859,7 +869,7 @@ function editInline(id){
   const v=validateParsed({client,activity,duration:dur,category:r.category,date});
   updateRegistration(id,v);
 }
- 
+
 function renderDashboard(){
   const total=regs.reduce((a,r)=>a+(r.duration||0),0);
   $('statTotal').textContent=total.toLocaleString('da-DK',{maximumFractionDigits:2});
@@ -869,7 +879,7 @@ function renderDashboard(){
   const now=new Date(); const day=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-day); monday.setHours(0,0,0,0);
   const week=regs.filter(r=>{const d=new Date(r.date);return d>=monday;}).reduce((a,r)=>a+(r.duration||0),0);
   $('statWeek').textContent=week.toLocaleString('da-DK',{maximumFractionDigits:2});
- 
+
   // donut by category
   const byCat={}; CATEGORIES.forEach(c=>byCat[c]=0); regs.forEach(r=>{byCat[r.category]=(byCat[r.category]||0)+(r.duration||0);});
   const cats=CATEGORIES.filter(c=>byCat[c]>0);
@@ -892,7 +902,7 @@ function renderDashboard(){
   if(!cats.length){ leg.innerHTML='<span class="muted small">Ingen data endnu.</span>'; }
   cats.forEach(c=>{const row=document.createElement('div');row.className='legrow';
     row.innerHTML=`<span class="swatch" style="background:${CAT_COLORS[c]}"></span><span style="flex:1">${esc(c)}</span><span class="muted">${byCat[c].toLocaleString('da-DK',{maximumFractionDigits:2})} t</span>`;leg.appendChild(row);});
- 
+
   // client bars
   const byClient={}; regs.forEach(r=>{const c=r.client.trim()||'(uden kunde)';byClient[c]=(byClient[c]||0)+(r.duration||0);});
   const sorted=Object.entries(byClient).sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -903,7 +913,7 @@ function renderDashboard(){
     d.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:5px"><span class="small">${esc(c)}</span><span class="small muted">${v.toLocaleString('da-DK',{maximumFractionDigits:2})} t</span></div>
       <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100)}%;background:${['#6366f1','#10b981','#fbbf24','#22d3ee','#a78bfa','#f43f5e'][i%6]}"></div></div>`;cb.appendChild(d);});
 }
- 
+
 // ============================================================
 //  Settings UI
 // ============================================================
@@ -922,12 +932,12 @@ function saveSettingsUI(){
   $('settingsPanel').classList.add('hidden');
   setSync(connected()?'Forbundet — klar':'Gemmer lokalt i din browser', connected()?'on':'');
 }
- 
+
 // ============================================================
 //  Wire up
 // ============================================================
 function initSelect(){ const s=$('mCategory'); CATEGORIES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;s.appendChild(o);}); }
- 
+
 function bind(){
   $('micBtn').onclick=()=> listening?stopListening():startListening();
   $('settingsBtn').onclick=openSettings;
@@ -953,7 +963,7 @@ function bind(){
     $('mClient').value='';$('mActivity').value='';$('mDuration').value='';$('mCategory').value='Udvikling';$('mDate').value=todayStr();
   };
 }
- 
+
 function boot(){
   // migrate: old "Møde" category -> "Mødetid"; ensure every reg has updatedAt (for multi-device merge)
   let migrated=false;
